@@ -4,7 +4,6 @@ import pandas as pd
 import pathlib
 import pytest
 from datetime import datetime
-import matplotlib.pyplot as plt
 from enmanage.prediction import Model, mfun, mfun_d_a, mfun_d_b, fit_optimal
 
 
@@ -51,8 +50,3 @@ def dataset(request):
     df.drop('date', 1, inplace=True)
 
     return df
-
-
-if __name__ == "__main__":
-    df = dataset(request='A_MRA')
-    test_learning(df)
