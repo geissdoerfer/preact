@@ -2,18 +2,20 @@ import numpy as np
 
 from .battery import Battery
 from .profiles import profiles
-from .managers import PREACT, LTENO, EWMA
-from .prediction import Model, fit_optimal, MBSGD, AST, SGD
+from .managers import PREACT, LTENO, STEWMA
+from .prediction import Model, fit_optimal, MBSGD, AST, SGD, OPTMODEL
+from .constants import *
 
 
 class Simulator(object):
-    def __init__(energy_manager, battery):
+    def __init__(self, energy_manager, energy_predictor, battery):
         self.energy_manager = energy_manager
         self.battery = battery
+        self.energy_predictor = energy_predictor
 
         self.e_out_prev = 0.0
 
-    def step(n, e_in):
+    def step(self, n, e_in):
         e_net = e_in-self.e_out_prev
 
         if(e_net < 0):
@@ -25,15 +27,19 @@ class Simulator(object):
             e_in_real = self.battery.charge(e_net)
             e_out_real = self.e_out_prev
 
-        self.e_out_prev = max(
-            0.0, self.energy_manager.calc_budget(
-                n, e_in_real, self.battery.get_soc()))
+        self.energy_predictor.step(n, e_in_real)
+        e_pred = self.energy_predictor.predict(np.arange(n + 1, n + 1 + 365))
 
-        return e_out_real, self.battery.soc
+        budget = self.energy_manager.calc_budget(
+            n, self.battery.get_soc(), e_pred)
+
+        self.e_out_prev = max(0.0, budget)
+
+        return e_out_real
 
 
-def get_error(e_out, e_req, e_in):
-    b = np.mean(e_in)/np.mean(e_req)
-    e_tmp = e_out-b*e_req
+def relative_underperformance(e_in, e_out, utility):
+
+    e_tmp = e_out - (utility / np.mean(utility) * np.mean(e_in))
     e_tmp[e_tmp >= 0.0] = 0.0
-    return -np.mean(e_tmp)/np.mean(e_in)
+    return - np.mean(e_tmp) / np.mean(e_in)

@@ -60,7 +60,7 @@ class Battery:
                 raise BatteryException("Battery undercharged")
             self.soc = self.soc + value_bat
 
-        return self.soc - prior_soc
+        return self.soc - soc_prior
 
     def can_supply(self):
         return self.soc * self.model_parameters['eta_out']
@@ -77,10 +77,9 @@ class Battery:
         return (self.model_parameters['loss_rate']
                 * (1.0 + self.estimation_errors['loss_rate']))
 
-    def get_capacity(self, n):
-        age_rate_est = (self.model_parameters['age_rate']
-                        * (1.0 + self.estimation_errors['age_rate']))
-        return self.battery.capacity * (1.0-n*age_rate_est)
+    def get_age_rate(self):
+        return (self.model_parameters['age_rate']
+                * (1.0 + self.estimation_errors['age_rate']))
 
     def get_soc(self):
         return (self.soc

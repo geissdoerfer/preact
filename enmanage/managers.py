@@ -41,120 +41,106 @@ class ControlledManager:
 
 class PREACT(EnergyManager, ControlledManager):
     def __init__(
-            self, control_coefficients, utility_function, power_factor=1.0):
+            self, battery_capacity, utility_function,
+            control_coefficients=None, battery_age_rate=0.0):
         ControlledManager.__init__(self, control_coefficients)
 
         self.utility_function = utility_function
-        self.en_predictor = MBSGD(scale=power_factor)
+        self.battery_capacity = battery_capacity
+        self.battery_age_rate = battery_age_rate
 
-    def calc_budget(self, n, e_in_real, soc):
+        self.step_count = 0
 
-        self.en_predictor.step(n, e_in_real)
+    def estimate_capacity(self, offset=0):
+        return (
+            self.battery_capacity
+            * (1.0 - (self.step_count + offset) * self.battery_age_rate)
+        )
+
+    def calc_budget(self, n, soc, e_pred):
 
         d_1y = np.arange(n+1, n+1+365)
 
-        e_in_pred = self.en_predictor.predict(d_1y)
-
         e_req = self.utility_function(d_1y)
-
-        f_req = np.mean(e_in_pred)/np.mean(e_req)
-
-        e_d_1y = e_in_pred - f_req*e_req
+        f_req = np.mean(e_pred)/np.mean(e_req)
+        e_d_1y = e_pred - f_req*e_req
 
         d_soc_1y = np.cumsum(e_d_1y)
-
         p2p_1y = max(d_soc_1y)-min(d_soc_1y)
 
+
         # The 0.9 lets the algorithm operate a bit more conservative
-        f_scale = 0.9*min(self.get_capacity(d_1y))/p2p_1y
+        f_scale = 0.9 * min(self.estimate_capacity(np.arange(365))) / p2p_1y
 
         if(f_scale < 1.0):
             d_soc_1y = f_scale * d_soc_1y
-            offset = (self.capacity - f_scale*p2p_1y)/2
+            offset = (self.estimate_capacity() - f_scale * p2p_1y) / 2
 
         else:
-            offset = (self.capacity - p2p_1y)/2
+            offset = (self.estimate_capacity() - p2p_1y) / 2
 
         soc_target = d_soc_1y[0] + offset - min(d_soc_1y)
 
-        dsoc = self.soc_control(soc_target, soc)
-        return e_in_pred[0]-dsoc
+        dsoc = self.soc_control(self.estimate_capacity(), soc_target, soc)
+
+        self.step_count += 1
+        return e_pred[0] - dsoc
 
 
-class EWMA(EnergyManager):
-    def __init__(alpha=0.5):
+class STEWMA(EnergyManager):
 
-        self.buf = 0.0
-        self.alpha = alpha
-
-    def calc_budget(self, n, e_in_real, soc):
-
-        self.buf = self.alpha * e_in_real + (1.0 - self.alpha) * self.buf
-
-        return self.buf
+    def calc_budget(self, n, soc, e_pred):
+        return e_pred[0]
 
 
 class LTENO(EnergyManager):
-    def __init__(
-            training_data, latitude, power_factor=C.PWR_FACTOR,
-            window_size=63):
-
-        self.power_factor = power_factor
-        self.en_predictor = AST(
-            training_data['t'], training_data['e_in']/self.power_factor,
-            latitude, window_size)
-
     @staticmethod
-    def constr_surplus(e_out, e_pred_1y, capacity, eta_bat_in):
-        e_d = e_pred_1y - e_out
+    def constr_surplus(e_out, e_pred, capacity, eta_bat_in):
+        e_d = e_pred - e_out
         e_d[e_d > 0] *= eta_bat_in
         surp = np.sum(e_d[e_d > 0])
         return surp - capacity
 
     @staticmethod
-    def constr_deficit(e_out, e_pred_1y, capacity, eta_bat_out):
-        e_d = e_pred_1y - e_out
+    def constr_deficit(e_out, e_pred, capacity, eta_bat_out):
+        e_d = e_pred - e_out
         e_d[e_d < 0] /= eta_bat_out
         defi = -np.sum(e_d[e_d < 0])
         return capacity - defi
 
     @staticmethod
-    def obj_eno(e_out, e_pred_1y):
-        return abs(np.mean(e_pred_1y)-e_out)
+    def obj_eno(e_out, e_pred):
+        return abs(np.mean(e_pred)-e_out)
 
-    def plan_capacity(self):
+    def plan_capacity(self, eta_bat_in, eta_bat_out, e_pred):
         ds_1y = np.arange(365)
-        e_in = self.en_predictor.predict(ds_1y)*self.power_factor
-        budget = np.mean(e_in)
-        e_d = e_in-budget
-        e_d[e_d > 0] *= self.eta_bat_in
-        e_d[e_d < 0] /= self.eta_bat_out
+        budget = np.mean(e_pred)
+        e_d = e_pred-budget
+        e_d[e_d > 0] *= eta_bat_in
+        e_d[e_d < 0] /= eta_bat_out
         soc_delta = np.cumsum(e_d)
         return max(soc_delta) - min(soc_delta)
 
-    def calc_budget(self, n, e_in_real, soc):
+    def calc_budget(self, n, soc, e_pred):
 
-        self.en_predictor.step(n, e_in_real/self.power_factor)
         d_1y = np.arange(0, 365)
 
-        e_pred_1y = self.en_predictor.predict(d_1y) * self.power_factor
-
-        x0 = np.mean(e_pred_1y)
+        x0 = np.mean(e_pred)
         constraints = [
             {
                 'type': 'ineq',
                 'fun': ETHManager.constr_surplus,
-                'args': [e_pred_1y, self.capacity, self.eta_bat_in]
+                'args': [e_pred, self.capacity, self.eta_bat_in]
             },
             {
                 'type': 'ineq',
                 'fun': ETHManager.constr_deficit,
-                'args': [e_pred_1y, self.capacity, self.eta_bat_out]
+                'args': [e_pred, self.capacity, self.eta_bat_out]
             }]
         res = minimize(
             LTENO.obj_eno,
             x0,
-            args=(e_pred_1y),
+            args=(e_pred),
             method='SLSQP',
             constraints=constraints,
             options={'maxiter': 250, 'ftol': 1e-04}

@@ -138,6 +138,34 @@ class AST(object):
         return self.alpha * mfun(d, self.p)
 
 
+class OPTMODEL(object):
+
+    def __init__(self, y_real, scale=1.0):
+
+        self.scale = scale
+        self.model = Model(mfun, (mfun_d_a, mfun_d_b))
+        self.y_real = y_real
+        self.step_count = 0
+
+        self.params = np.zeros(2)
+
+    def step(self, x, y):
+
+        d_1y = np.arange(x+1, x+1+365)
+        ix_1y = np.arange(self.step_count + 1, self.step_count + 1 + 365)
+
+        self.params = fit_optimal(
+            d_1y,
+            self.y_real[ix_1y] / self.scale,
+            self.model
+        )
+
+        self.step_count += 1
+
+    def predict(self, x):
+        return mfun(x, self.params) * self.scale
+
+
 class SGD(object):
     @staticmethod
     def fn_eta(d):
@@ -258,6 +286,18 @@ class MBSGD(object):
 
     def predict(self, x):
         return mfun(x, self.params)*self.scale
+
+
+def EWMA(object):
+    def __init__(self, alpha=0.5):
+        self.alpha = 0.5
+        self.buffer = 0.0
+
+    def step(self, x, y):
+        self.buffer = self.alpha * y + (1.0 - self.alpha) * self.buffer
+
+    def predict(self, x):
+        return self.buffer
 
 
 class Model:
