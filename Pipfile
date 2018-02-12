@@ -15,6 +15,7 @@ jupyter = "*"
 seaborn = "*"
 pytest = "*"
 pytest-sugar = "*"
+parse = "*"
 
 
 [dev-packages]

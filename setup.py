@@ -9,7 +9,7 @@ with open('LICENSE') as f:
 setup(
     name='enmanage',
     version='0.1.0',
-    description='Sample package for Python-Guide.org',
+    description='Energy Management on Solar Harvesting Sensor nodes',
     long_description=readme,
     author='Kai Geissdoerfer',
     author_email='kai.geissdoerfer@tu-dresden.de',

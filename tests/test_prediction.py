@@ -3,33 +3,26 @@ import numpy as np
 import pandas as pd
 import pathlib
 import pytest
+import parse
 from datetime import datetime
-from enmanage.prediction import Model, mfun, mfun_d_a, mfun_d_b, fit_optimal
+from enmanage.prediction import *
 
 
-def mse(xs, ys, model, parameters):
+def mse(doy, e_in_truth, e_in_pred):
     return np.mean((ys - model.mfun(xs, parameters)) ** 2)
 
 
-def test_learning(dataset):
+def test_prediction(meta_fix):
 
-    xs = np.array(dataset.index.dayofyear)[:365]
-    ys = dataset['exposure'].as_matrix()[:365]
+    en_predictor, doy, e_in = meta_fix
 
-    predictor = enmanage.MBSGD(scale=1.0)
+    mses = np.zeros(len(doy))
+    for i in range(len(doy)):
+        en_predictor.step(doy[i], e_in[i])
+        e_in_pred = en_predictor.predict(doy)
+        mses[i] = np.mean((e_in - e_in_pred) ** 2)
 
-    model = Model(mfun, (mfun_d_a, mfun_d_b))
-    opt_parameters = fit_optimal(xs, ys, model)
-
-    mses = np.zeros(len(xs))
-    for i in range(len(xs)):
-        predictor.step(xs[i], ys[i])
-        mses[i] = mse(xs, ys, model, predictor.params)
-
-    mse_offline = mse(xs, ys, model, opt_parameters)
-    mse_online = mse(xs, ys, model, predictor.params)
-
-    assert(abs(mse_offline - mse_online) < 0.25 * mse_offline)
+    assert(mses[-1] < 15.0)
 
 
 @pytest.fixture(params=['A_MRA', 'B_ASP', 'C_BLN', 'D_HBN', 'E_IJK'])
@@ -49,4 +42,29 @@ def dataset(request):
     df.set_index(df['date'], inplace=True)
     df.drop('date', 1, inplace=True)
 
-    return df
+    with open(filepath, 'r') as f:
+        for _ in range(3):
+            line = f.readline()
+        latitude = parse.search('Latitude {:f}', line)[0] / 360.0 * 2 * np.pi
+
+    return {'data': df, 'latitude': latitude}
+
+
+@pytest.fixture(params=[EWMA, AST, MBSGD, OPTMODEL])
+def meta_fix(dataset, request):
+
+    doy = np.array(dataset['data'].index.dayofyear)
+    e_in = dataset['data']['exposure'].as_matrix()
+
+    if(request.param is AST):
+        en_predictor = request.param(
+            doy[:365],
+            e_in[:365],
+            dataset['latitude']
+            )
+    elif(request.param is OPTMODEL):
+        en_predictor = request.param(e_in[365:3*365])
+    else:
+        en_predictor = request.param()
+
+    return en_predictor, doy[365:2*365], e_in[365:2*365]
