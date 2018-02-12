@@ -16,7 +16,7 @@ class Simulator(object):
         self.e_out_prev = 0.0
 
     def step(self, n, e_in):
-        e_net = e_in-self.e_out_prev
+        e_net = e_in - self.e_out_prev
 
         if(e_net < 0):
             e_charge_real = min(abs(e_net), self.battery.can_supply())
@@ -24,7 +24,7 @@ class Simulator(object):
             e_in_real = e_in
             e_out_real = e_charge_real + e_in
         else:
-            e_in_real = self.battery.charge(e_net)
+            e_in_real = self.battery.charge(e_net) + self.e_out_prev
             e_out_real = self.e_out_prev
 
         self.energy_predictor.step(n, e_in_real)
