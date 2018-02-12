@@ -3,7 +3,7 @@ import numpy as np
 from .battery import Battery
 from .profiles import profiles
 from .managers import PREACT, LTENO, STEWMA
-from .prediction import MBSGD, AST, SGD, OPTMODEL, CLAIRVOYANT
+from .prediction import EWMA, MBSGD, AST, SGD, OPTMODEL, CLAIRVOYANT
 from .constants import *
 
 
