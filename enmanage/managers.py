@@ -43,6 +43,10 @@ class PREACT(EnergyManager, ControlledManager):
     def __init__(
             self, battery_capacity, utility_function,
             control_coefficients=None, battery_age_rate=0.0):
+
+        if not control_coefficients:
+            control_coefficients = {'k_p': 0.25, 'k_i': 0.0, 'k_d': 0.0}
+
         ControlledManager.__init__(self, control_coefficients)
 
         self.utility_function = utility_function
@@ -94,6 +98,11 @@ class STEWMA(EnergyManager):
 
 
 class LTENO(EnergyManager):
+    def __init__(self, battery_capacity, eta_bat_in, eta_bat_out):
+        self.capacity = battery_capacity
+        self.eta_bat_in = eta_bat_in
+        self.eta_bat_out = eta_bat_out
+
     @staticmethod
     def constr_surplus(e_out, e_pred, capacity, eta_bat_in):
         e_d = e_pred - e_out
@@ -129,12 +138,12 @@ class LTENO(EnergyManager):
         constraints = [
             {
                 'type': 'ineq',
-                'fun': ETHManager.constr_surplus,
+                'fun': LTENO.constr_surplus,
                 'args': [e_pred, self.capacity, self.eta_bat_in]
             },
             {
                 'type': 'ineq',
-                'fun': ETHManager.constr_deficit,
+                'fun': LTENO.constr_deficit,
                 'args': [e_pred, self.capacity, self.eta_bat_out]
             }]
         res = minimize(
