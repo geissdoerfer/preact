@@ -288,7 +288,7 @@ class MBSGD(object):
         return mfun(x, self.params)*self.scale
 
 
-def EWMA(object):
+class EWMA(object):
     def __init__(self, alpha=0.5):
         self.alpha = 0.5
         self.buffer = 0.0
