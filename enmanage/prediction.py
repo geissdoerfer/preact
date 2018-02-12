@@ -138,6 +138,24 @@ class AST(object):
         return self.alpha * mfun(d, self.p)
 
 
+class CLAIRVOYANT(object):
+
+    def __init__(self, y_real, scale=1.0):
+
+        self.y_real = y_real
+        self.step_count = 0
+
+    def step(self, x, y):
+        self.step_count += 1
+
+    def predict(self, x):
+        if hasattr(x, "__len__"):
+            return self.y_real[
+                self.step_count + 1:self.step_count + 1 + len(x)]
+        else:
+            return self.y_real[self.step_count + 1]
+
+
 class OPTMODEL(object):
 
     def __init__(self, y_real, scale=1.0):
