@@ -72,8 +72,7 @@ class PREACT(EnergyManager, ControlledManager):
         d_soc_1y = np.cumsum(e_d_1y)
         p2p_1y = max(d_soc_1y)-min(d_soc_1y)
 
-        # The 0.9 lets the algorithm operate a bit more conservative
-        f_scale = 0.9 * min(self.estimate_capacity(np.arange(365))) / p2p_1y
+        f_scale = min(self.estimate_capacity(np.arange(365))) / p2p_1y
 
         if(f_scale < 1.0):
             d_soc_1y = f_scale * d_soc_1y
