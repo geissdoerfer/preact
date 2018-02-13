@@ -8,11 +8,13 @@ from nasadata import fxt_dataset
 def test_manage(fxt_dataset, battery, en_manager):
 
     doy = np.array(fxt_dataset['data'].index.dayofyear)[:365]
-    e_in = fxt_dataset['data']['exposure'].as_matrix()
+    e_in = fxt_dataset['data']['exposure'].as_matrix() * enmanage.PWR_FACTOR
 
     en_predictor = enmanage.CLAIRVOYANT(e_in)
+    consumer = enmanage.Consumer(max(e_in[:len(doy)]))
 
-    simulator = enmanage.Simulator(en_manager, en_predictor, battery)
+    simulator = enmanage.Simulator(
+        consumer, en_manager, en_predictor, battery)
 
     budget = np.zeros(len(doy))
     for i in range(len(doy)):
@@ -36,15 +38,19 @@ def battery():
 @pytest.fixture(params=[PREACT, LTENO, STEWMA])
 def en_manager(fxt_dataset, battery, request):
 
+    max_budget = max(fxt_dataset['data']['exposure']) * enmanage.PWR_FACTOR
     if(request.param is PREACT):
         en_manager = request.param(
             battery.capacity, enmanage.profiles['uniform']
         )
     elif(request.param is LTENO):
         en_manager = request.param(
-            battery.capacity, battery.get_eta_in(), battery.get_eta_out()
+            max_budget,
+            battery.capacity,
+            battery.get_eta_in(),
+            battery.get_eta_out()
         )
-    else:
-        en_manager = request.param()
+    elif(request.param is STEWMA):
+        en_manager = request.param(max_budget)
 
     return en_manager

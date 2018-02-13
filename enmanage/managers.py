@@ -25,18 +25,18 @@ class ControlledManager:
 
     def soc_control(self, capacity, soc_target, soc):
 
-        e = (soc_target - soc) / capacity
+        e = (soc - soc_target) / capacity
         self.e_sum += e
         e_d = e - self.e_prev
         self.e_prev = e
 
-        dsoc = (
+        dc = (
             self.coefficients['k_p'] * e
             + self.coefficients['k_i'] * self.e_sum
             + self.coefficients['k_d'] * e_d
         )
 
-        return dsoc * capacity
+        return dc
 
 
 class PREACT(EnergyManager, ControlledManager):
@@ -44,14 +44,13 @@ class PREACT(EnergyManager, ControlledManager):
             self, battery_capacity, utility_function,
             control_coefficients=None, battery_age_rate=0.0):
 
-        if not control_coefficients:
-            control_coefficients = {'k_p': 0.25, 'k_i': 0.0, 'k_d': 0.0}
-
         ControlledManager.__init__(self, control_coefficients)
 
         self.utility_function = utility_function
         self.battery_capacity = battery_capacity
         self.battery_age_rate = battery_age_rate
+
+        self.duty_cycle = 0.5
 
         self.step_count = 0
 
@@ -61,9 +60,9 @@ class PREACT(EnergyManager, ControlledManager):
             * (1.0 - (self.step_count + offset) * self.battery_age_rate)
         )
 
-    def calc_budget(self, n, soc, e_pred):
+    def calc_duty_cycle(self, n, soc, e_pred):
 
-        d_1y = np.arange(n+1, n+1+365)
+        d_1y = np.arange(n + 1, n + 1 + 365)
 
         e_req = self.utility_function(d_1y)
         f_req = np.mean(e_pred)/np.mean(e_req)
@@ -83,23 +82,29 @@ class PREACT(EnergyManager, ControlledManager):
 
         soc_target = d_soc_1y[0] + offset - min(d_soc_1y)
 
-        dsoc = self.soc_control(self.estimate_capacity(), soc_target, soc)
-
         self.step_count += 1
-        return e_pred[0] - dsoc
+
+        d_duty_cycle = self.soc_control(
+            self.estimate_capacity(), soc_target, soc)
+        self.duty_cycle = max(0.0, min(1.0, self.duty_cycle + d_duty_cycle))
+        return self.duty_cycle
 
 
 class STEWMA(EnergyManager):
+    def __init__(self, e_out_max):
+        self.e_out_max = e_out_max
 
-    def calc_budget(self, n, soc, e_pred):
-        return e_pred
+    def calc_duty_cycle(self, n, soc, e_pred):
+        return e_pred[0] / self.e_out_max
 
 
 class LTENO(EnergyManager):
-    def __init__(self, battery_capacity, eta_bat_in, eta_bat_out):
+    def __init__(self, e_out_max, battery_capacity, eta_bat_in, eta_bat_out):
         self.capacity = battery_capacity
         self.eta_bat_in = eta_bat_in
         self.eta_bat_out = eta_bat_out
+
+        self.e_out_max = e_out_max
 
     @staticmethod
     def constr_surplus(e_out, e_pred, capacity, eta_bat_in):
@@ -119,7 +124,7 @@ class LTENO(EnergyManager):
     def obj_eno(e_out, e_pred):
         return abs(np.mean(e_pred)-e_out)
 
-    def calc_budget(self, n, soc, e_pred):
+    def calc_duty_cycle(self, n, soc, e_pred):
 
         d_1y = np.arange(0, 365)
 
@@ -144,7 +149,7 @@ class LTENO(EnergyManager):
             options={'maxiter': 250, 'ftol': 1e-04}
             )
 
-        return res.x[0]
+        return res.x[0] / self.e_out_max
 
 
 class OptimalManager(EnergyManager, ControlledManager):
@@ -210,7 +215,7 @@ class OptimalManager(EnergyManager, ControlledManager):
 
         self.budget = np.append(res.x[1:], 0.0)
 
-    def calc_budget(self, n, e_in_real, soc):
+    def calc_duty_cycle(self, n, e_in_real, soc):
 
         # print self.pred_soc[n], self.battery.soc
         # dsoc = self.soc_control(self.target_soc[n-self.t_offset+1], soc)
