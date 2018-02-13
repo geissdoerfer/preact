@@ -1,10 +1,14 @@
 import numpy as np
+import logging
 
 from .battery import Battery
 from .profiles import profiles
 from .managers import PREACT, LTENO, STEWMA
 from .prediction import EWMA, MBSGD, AST, SGD, OPTMODEL, CLAIRVOYANT
 from .constants import *
+
+
+log = logging.getLogger("simulator")
 
 
 class Simulator(object):
@@ -34,7 +38,12 @@ class Simulator(object):
             n, self.battery.get_soc(), e_pred)
 
         self.e_out_prev = max(0.0, budget)
-
+        log.debug((
+            f'e_in={e_in:.{3}} '
+            f'e_in_real={e_in_real:.{3}} '
+            f'e_out_real={e_in:.{3}} '
+            f'soc={self.battery.soc/self.battery.capacity:.{3}}'
+        ))
         return e_out_real
 
 
