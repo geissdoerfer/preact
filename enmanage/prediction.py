@@ -315,7 +315,7 @@ class EWMA(object):
         self.buffer = self.alpha * y + (1.0 - self.alpha) * self.buffer
 
     def predict(self, x):
-        return self.buffer
+        return self.buffer*np.ones(len(x))
 
 
 class Model:
