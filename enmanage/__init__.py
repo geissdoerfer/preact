@@ -38,6 +38,16 @@ class Simulator(object):
         return e_out_real
 
 
+def plan_capacity(eta_bat_in, eta_bat_out, e_pred):
+
+    budget = np.mean(e_pred)
+    e_d = e_pred - budget
+    e_d[e_d > 0] *= eta_bat_in
+    e_d[e_d < 0] /= eta_bat_out
+    soc_delta = np.cumsum(e_d)
+    return max(soc_delta) - min(soc_delta)
+
+
 def relative_underperformance(e_in, e_out, utility):
 
     e_tmp = e_out - (utility / np.mean(utility) * np.mean(e_in))

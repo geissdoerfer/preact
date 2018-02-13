@@ -119,15 +119,6 @@ class LTENO(EnergyManager):
     def obj_eno(e_out, e_pred):
         return abs(np.mean(e_pred)-e_out)
 
-    def plan_capacity(self, eta_bat_in, eta_bat_out, e_pred):
-        ds_1y = np.arange(365)
-        budget = np.mean(e_pred)
-        e_d = e_pred-budget
-        e_d[e_d > 0] *= eta_bat_in
-        e_d[e_d < 0] /= eta_bat_out
-        soc_delta = np.cumsum(e_d)
-        return max(soc_delta) - min(soc_delta)
-
     def calc_budget(self, n, soc, e_pred):
 
         d_1y = np.arange(0, 365)
