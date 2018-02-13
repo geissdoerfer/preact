@@ -92,7 +92,7 @@ class PREACT(EnergyManager, ControlledManager):
 class STEWMA(EnergyManager):
 
     def calc_budget(self, n, soc, e_pred):
-        return e_pred[0]
+        return e_pred
 
 
 class LTENO(EnergyManager):
