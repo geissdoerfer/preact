@@ -65,6 +65,9 @@ class Battery:
     def can_supply(self):
         return self.soc * self.model_parameters['eta_out']
 
+    def can_absorb(self):
+        return (self.capacity - self.soc) / self.model_parameters['eta_in']
+
     def get_eta_in(self):
         return (self.model_parameters['eta_in']
                 * (1.0 + self.estimation_errors['etas']))

@@ -28,7 +28,9 @@ class Simulator(object):
             e_in_real = e_in
             e_out_real = e_charge_real + e_in
         else:
-            e_in_real = self.battery.charge(e_net) + self.e_out_prev
+            e_charge_real = min(e_net, self.battery.can_absorb())
+            self.battery.charge(e_charge_real)
+            e_in_real = e_charge_real + self.e_out_prev
             e_out_real = self.e_out_prev
 
         self.energy_predictor.step(n, e_in_real)
