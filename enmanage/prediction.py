@@ -325,11 +325,11 @@ class EWMA(object):
         self.alpha = 0.5
         self.buffer = 0.0
 
-    def step(self, x, y):
+    def step(self, y):
         self.buffer = self.alpha * y + (1.0 - self.alpha) * self.buffer
 
-    def predict(self, x):
-        return self.buffer*np.ones(len(x))
+    def predict(self):
+        return self.buffer
 
 
 class Model:

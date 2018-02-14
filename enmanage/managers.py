@@ -95,8 +95,8 @@ class STEWMA(EnergyManager):
     def __init__(self, e_out_max):
         self.e_out_max = e_out_max
 
-    def calc_duty_cycle(self, n, soc, e_pred):
-        return e_pred[0] / self.e_out_max
+    def calc_duty_cycle(self, e_pred):
+        return e_pred / self.e_out_max
 
 
 class LTENO(EnergyManager):
