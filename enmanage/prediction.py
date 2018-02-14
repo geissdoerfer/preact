@@ -113,6 +113,20 @@ class AST(object):
 
         self.step_count = 0
 
+        # Calculate intersections of energy model function and mean (See paper)
+        e_ins_pred = self.predict(np.arange(365))
+        self.d = np.empty(3, dtype=int)
+        self.d[0] = np.argmax(
+            np.diff(np.sign(e_ins_pred - np.mean(e_ins_pred))) > 0)
+        self.d[2] = self.d[0] + 365
+        search_region = np.arange(self.d[0], self.d[2], dtype=int) % 365
+        sign_changes = np.diff(
+            np.sign(
+                e_ins_pred[search_region] - np.mean(e_ins_pred)
+            )
+        )
+        self.d[1] = np.argmax(sign_changes < 0) + self.d[0]
+
     def step(self, d, y):
 
         # Calculate circular index for mini-batch buffer

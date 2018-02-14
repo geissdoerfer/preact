@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize, curve_fit
+import copy
 
 from .prediction import MBSGD, AST
 from .profiles import profiles
@@ -99,57 +100,62 @@ class STEWMA(EnergyManager):
 
 
 class LTENO(EnergyManager):
-    def __init__(self, e_out_max, battery_capacity, eta_bat_in, eta_bat_out):
-        self.capacity = battery_capacity
-        self.eta_bat_in = eta_bat_in
-        self.eta_bat_out = eta_bat_out
+    def __init__(
+            self, battery_capacity, e_out_max, d,
+            eta_bat_in=1.0, eta_bat_out=1.0):
 
+        # Scale from nominal capacity
+        self.battery_capacity = battery_capacity * eta_bat_out
         self.e_out_max = e_out_max
+        self.eta_bat_in = eta_bat_in
+        self.d = d
+
+    def calc_duty_cycle(self, e_pred, alpha):
+
+        e_pred = e_pred * self.eta_bat_in
+        d = copy.copy(self.d)
+        deficit = LTENO.deficit(e_pred, self.d)
+        surplus = LTENO.surplus(e_pred, self.d)
+        while (deficit <= surplus) and (surplus < self.battery_capacity):
+            d_ = copy.copy(d)
+
+            if(alpha < 1):
+                d[0] = d[0] + 1
+                d[1] = d[1] - 1
+                d[2] = d[2] + 1
+            else:
+                d[0] = d[0] - 1
+                d[1] = d[1] + 1
+                d[2] = d[2] - 1
+
+            deficit = LTENO.deficit(e_pred, d)
+            surplus = LTENO.surplus(e_pred, d)
+            if(surplus < deficit):
+                d[0] = d_[0]
+                d[1] = d_[1]
+                d[2] = d_[2]
+                surplus = LTENO.surplus(e_pred, d)
+                break
+
+        return e_pred[d[1] % 365] / self.e_out_max
 
     @staticmethod
-    def constr_surplus(e_out, e_pred, capacity, eta_bat_in):
-        e_d = e_pred - e_out
-        e_d[e_d > 0] *= eta_bat_in
-        surp = np.sum(e_d[e_d > 0])
-        return surp - capacity
+    def deficit(e_pred, d):
+        deficit_region = np.arange(d[1], d[2]) % 365
+        deficit = (
+            e_pred[d[1] % 365] * (d[2] - d[1] + 1)
+            - np.sum(e_pred[deficit_region])
+        )
+        return deficit
 
     @staticmethod
-    def constr_deficit(e_out, e_pred, capacity, eta_bat_out):
-        e_d = e_pred - e_out
-        e_d[e_d < 0] /= eta_bat_out
-        defi = -np.sum(e_d[e_d < 0])
-        return capacity - defi
-
-    @staticmethod
-    def obj_eno(e_out, e_pred):
-        return abs(np.mean(e_pred)-e_out)
-
-    def calc_duty_cycle(self, n, soc, e_pred):
-
-        d_1y = np.arange(0, 365)
-
-        x0 = np.mean(e_pred)
-        constraints = [
-            {
-                'type': 'ineq',
-                'fun': LTENO.constr_surplus,
-                'args': [e_pred, self.capacity, self.eta_bat_in]
-            },
-            {
-                'type': 'ineq',
-                'fun': LTENO.constr_deficit,
-                'args': [e_pred, self.capacity, self.eta_bat_out]
-            }]
-        res = minimize(
-            LTENO.obj_eno,
-            x0,
-            args=(e_pred),
-            method='SLSQP',
-            constraints=constraints,
-            options={'maxiter': 250, 'ftol': 1e-04}
-            )
-
-        return res.x[0] / self.e_out_max
+    def surplus(e_pred, d):
+        surplus_region = np.arange(d[0], d[1]) % 365
+        surplus = (
+            np.sum(e_pred[surplus_region])
+            - e_pred[d[0]] * (d[1] - d[0] + 1)
+        )
+        return surplus
 
 
 class OptimalManager(EnergyManager, ControlledManager):
