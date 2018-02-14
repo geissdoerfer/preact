@@ -20,13 +20,16 @@ class Consumer(object):
 
 
 class Simulator(object):
-    def __init__(self, consumer, energy_manager, energy_predictor, battery):
-        self.energy_manager = energy_manager
+    def __init__(
+            self, consumer, battery, dc_init=1.0):
+
         self.battery = battery
-        self.energy_predictor = energy_predictor
         self.consumer = consumer
 
-        self.duty_cycle = 0.0
+        self.duty_cycle = dc_init
+
+    def set_duty_cycle(self, duty_cycle):
+        self.duty_cycle = max(0.0, min(1.0, duty_cycle))
 
     def step(self, n, e_in):
 
@@ -44,21 +47,14 @@ class Simulator(object):
             e_in_real = e_charge_real + e_out
             e_out_real = e_out
 
-        self.energy_predictor.step(n, e_in_real)
-        e_pred = self.energy_predictor.predict(np.arange(n + 1, n + 1 + 365))
-
-        duty_cycle = self.energy_manager.calc_duty_cycle(
-            n, self.battery.get_soc(), e_pred)
-
-        self.duty_cycle = max(0.0, duty_cycle)
         log.debug((
             f'e_in={e_in:.{3}} '
             f'e_in_real={e_in_real:.{3}} '
             f'e_out_real={e_in:.{3}} '
-            f'duty_cycle={duty_cycle:.{2}} '
             f'soc={self.battery.soc/self.battery.capacity:.{3}}'
         ))
-        return e_out_real
+
+        return e_in_real, e_out_real, self.battery.get_soc()
 
 
 def plan_capacity(eta_bat_in, eta_bat_out, e_pred):

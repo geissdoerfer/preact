@@ -13,12 +13,16 @@ def test_manage(fxt_dataset, battery, en_manager):
     en_predictor = enmanage.CLAIRVOYANT(e_in)
     consumer = enmanage.Consumer(max(e_in[:len(doy)]))
 
-    simulator = enmanage.Simulator(
-        consumer, en_manager, en_predictor, battery)
+    simulator = enmanage.Simulator(consumer, battery)
 
     budget = np.zeros(len(doy))
     for i in range(len(doy)):
-        budget[i] = simulator.step(doy[i], e_in[i])
+        e_in_real, budget[i], soc = simulator.step(doy[i], e_in[i])
+        en_predictor.step(doy[i], e_in_real)
+        e_pred = en_predictor.predict(np.arange(doy[i] + 1, doy[i] + 1 + 365))
+        duty_cycle = en_manager.calc_duty_cycle(
+            doy[i], soc, e_pred)
+        simulator.set_duty_cycle(duty_cycle)
 
     rup = enmanage.relative_underperformance(
         e_in[:len(doy)], budget, enmanage.profiles['uniform'](doy))

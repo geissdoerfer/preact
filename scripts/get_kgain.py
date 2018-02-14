@@ -42,14 +42,17 @@ def simulate(
         battery.capacity, utility, control_coefficients)
 
     consumer = enmanage.Consumer(max(e_ins))
-    simulator = enmanage.Simulator(consumer, manager, predictor, battery)
+    simulator = enmanage.Simulator(consumer, battery)
 
     budget = np.zeros(len(doys) - TRAINING_OFFSET)
-    soc = np.zeros(len(doys) - TRAINING_OFFSET)
 
     for i in range(TRAINING_OFFSET, len(doys)):
-        budget[i-TRAINING_OFFSET] = simulator.step(doys[i], e_ins[i])
-        soc[i-TRAINING_OFFSET] = simulator.battery.soc
+        e_in_real, budget[i-TRAINING_OFFSET], soc = simulator.step(
+            doys[i], e_ins[i])
+        predictor.step(doys[i], e_in_real)
+        e_pred = predictor.predict(np.arange(doys[i] + 1, doys[i] + 1 + 365))
+        duty_cycle = manager.calc_duty_cycle(doys[i], soc, e_pred)
+        simulator.set_duty_cycle(duty_cycle)
 
     rup = enmanage.relative_underperformance(
         e_ins[TRAINING_OFFSET:], budget, utility(doys[TRAINING_OFFSET:]))
