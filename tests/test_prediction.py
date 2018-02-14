@@ -3,38 +3,43 @@ import numpy as np
 import pytest
 from datetime import datetime
 from enmanage.prediction import *
-from nasadata import fxt_dataset
+from nasadata import fxt_dataset, eval_data, training_data
 
 
-def test_prediction(en_predictor, fxt_dataset):
+def test_mbsgd(eval_data):
+    predictor = enmanage.MBSGD()
+    eval_predictor(predictor, eval_data['doy'], eval_data['e_in'])
 
-    doy = np.array(fxt_dataset['data'].index.dayofyear)[:365]
-    e_in = fxt_dataset['data']['exposure'].as_matrix()[:365]
 
-    mses = np.zeros(len(doy))
-    for i in range(len(doy)):
-        en_predictor.step(doy[i], e_in[i])
-        e_in_pred = en_predictor.predict(doy)
+def test_sgd(eval_data):
+    predictor = enmanage.SGD()
+    eval_predictor(predictor, eval_data['doy'], eval_data['e_in'])
+
+
+def test_ast(eval_data, training_data, fxt_dataset):
+    predictor = enmanage.AST(
+        training_data['doy'], training_data['e_in'], fxt_dataset['latitude'])
+    eval_predictor(predictor, eval_data['doy'], eval_data['e_in'])
+
+
+def eval_predictor(en_predictor, doys, e_ins):
+    mses = np.zeros(len(doys))
+    for i, (doy, e_in) in enumerate(zip(doys, e_ins)):
+        en_predictor.step(doy, e_in)
+        e_in_pred = en_predictor.predict(np.arange(doy + 1, doy + 1 + 365))
         mses[i] = np.mean((e_in - e_in_pred) ** 2)
 
-    assert(mses[-1] < 15.0)
+    assert(mses[-1] < 50.0)
 
 
-@pytest.fixture(params=[EWMA, AST, MBSGD, OPTMODEL])
-def en_predictor(fxt_dataset, request):
+def test_ewma(eval_data):
+    en_predictor = enmanage.EWMA()
 
-    doy = np.array(fxt_dataset['data'].index.dayofyear)
-    e_in = fxt_dataset['data']['exposure'].as_matrix()
+    errors = np.zeros(len(eval_data['doy']))
+    for i, (doy, e_in) in enumerate(
+            zip(eval_data['doy'], eval_data['e_in'])):
+        en_predictor.step(e_in)
+        e_in_pred = en_predictor.predict()
+        errors[i] = eval_data['e_in'][i] - e_in_pred
 
-    if(request.param is AST):
-        predictor = request.param(
-            doy[-365:],
-            e_in[-365:],
-            fxt_dataset['latitude']
-            )
-    elif(request.param is OPTMODEL):
-        predictor = request.param(e_in[:2*365])
-    else:
-        predictor = request.param()
-
-    return predictor
+    assert(np.mean(errors ** 2) < 15.0)

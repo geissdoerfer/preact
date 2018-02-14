@@ -4,6 +4,7 @@ import pytest
 from datetime import datetime
 import pandas as pd
 import numpy as np
+import enmanage
 
 
 @pytest.fixture(params=['A_MRA', 'B_ASP', 'C_BLN', 'D_HBN', 'E_IJK'])
@@ -29,3 +30,25 @@ def fxt_dataset(request):
         latitude = parse.search('Latitude {:f}', line)[0] / 360.0 * 2 * np.pi
 
     return {'data': df, 'latitude': latitude}
+
+
+@pytest.fixture()
+def eval_data(fxt_dataset):
+    doy = np.array(fxt_dataset['data'].index.dayofyear)[365:6 * 365]
+    e_in = (
+        fxt_dataset['data']
+        ['exposure'].as_matrix()[365:] * enmanage.PWR_FACTOR
+    )
+
+    return {'doy': doy, 'e_in': e_in}
+
+
+@pytest.fixture()
+def training_data(fxt_dataset):
+    doy = np.array(fxt_dataset['data'].index.dayofyear)[:365]
+    e_in = (
+        fxt_dataset['data']
+        ['exposure'].as_matrix()[:365] * enmanage.PWR_FACTOR
+    )
+
+    return {'doy': doy, 'e_in': e_in}
