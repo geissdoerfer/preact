@@ -172,27 +172,21 @@ class CLAIRVOYANT(object):
 
 class OPTMODEL(object):
 
-    def __init__(self, y_real, scale=1.0):
+    def __init__(self, x_real, y_real, scale):
 
         self.scale = scale
-        self.model = Model(mfun, (mfun_d_a, mfun_d_b))
-        self.y_real = y_real
+        model = Model(mfun, (mfun_d_a, mfun_d_b))
+
         self.step_count = 0
 
-        self.params = np.zeros(2)
-
-    def step(self, x, y):
-
-        d_1y = np.arange(x+1, x+1+365)
-        ix_1y = np.arange(self.step_count + 1, self.step_count + 1 + 365)
-
         self.params = fit_optimal(
-            d_1y,
-            self.y_real[ix_1y] / self.scale,
-            self.model
+            x_real,
+            y_real / self.scale,
+            model
         )
 
-        self.step_count += 1
+    def step(self, x, y):
+        pass
 
     def predict(self, x):
         return mfun(x, self.params) * self.scale
