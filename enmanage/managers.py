@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize, curve_fit
 import copy
+import logging
 
 from .prediction import MBSGD, AST
 from .profiles import profiles
@@ -101,7 +102,7 @@ class STEWMA(EnergyManager):
 
 class LTENO(EnergyManager):
     def __init__(
-            self, battery_capacity, e_out_max, d,
+            self, e_out_max, battery_capacity, d,
             eta_bat_in=1.0, eta_bat_out=1.0):
 
         # Scale from nominal capacity
@@ -110,20 +111,29 @@ class LTENO(EnergyManager):
         self.eta_bat_in = eta_bat_in
         self.d = d
 
+        self.log = logging.getLogger("LT-ENO")
+        self.log.debug(f'capacity: {self.battery_capacity:.{3}}')
+
     def calc_duty_cycle(self, e_pred, alpha):
 
         e_pred = e_pred * self.eta_bat_in
         d = copy.copy(self.d)
         deficit = LTENO.deficit(e_pred, self.d)
         surplus = LTENO.surplus(e_pred, self.d)
+        self.log.debug((
+            f'initial: surplus={surplus:.{3}} deficit={deficit:.{3}}'
+            f' alpha={alpha:.{3}} {"under" if alpha>1.0 else "over"}estimated'
+        ))
         while (deficit <= surplus) and (surplus < self.battery_capacity):
             d_ = copy.copy(d)
 
-            if(alpha < 1):
+            if(alpha > 1):
+                self.log.debug('decreasing surplus')
                 d[0] = d[0] + 1
                 d[1] = d[1] - 1
                 d[2] = d[2] + 1
             else:
+                self.log.debug('decreasing deficit')
                 d[0] = d[0] - 1
                 d[1] = d[1] + 1
                 d[2] = d[2] - 1
@@ -131,13 +141,14 @@ class LTENO(EnergyManager):
             deficit = LTENO.deficit(e_pred, d)
             surplus = LTENO.surplus(e_pred, d)
             if(surplus < deficit):
-                d[0] = d_[0]
-                d[1] = d_[1]
-                d[2] = d_[2]
+                self.log.debug('stopping: surplus < deficit')
+                d = copy.copy(d_)
                 surplus = LTENO.surplus(e_pred, d)
                 break
 
-        return e_pred[d[1] % 365] / self.e_out_max
+        duty_cycle = e_pred[d[1] % 365] / self.e_out_max
+        self.log.debug(f'd1={d[1]} dutycycle={duty_cycle:.{3}}')
+        return duty_cycle
 
     @staticmethod
     def deficit(e_pred, d):
