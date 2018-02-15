@@ -56,6 +56,8 @@ class PREACT(EnergyManager, ControlledManager):
 
         self.step_count = 0
 
+        self.log = logging.getLogger("PREACT")
+
     def estimate_capacity(self, offset=0):
         return (
             self.battery_capacity
@@ -73,7 +75,9 @@ class PREACT(EnergyManager, ControlledManager):
         d_soc_1y = np.cumsum(e_d_1y)
         p2p_1y = max(d_soc_1y)-min(d_soc_1y)
 
-        f_scale = min(self.estimate_capacity(np.arange(365))) / p2p_1y
+        min_capacity_1y = min(self.estimate_capacity(np.arange(365)))
+
+        f_scale = min_capacity_1y / p2p_1y
 
         if(f_scale < 1.0):
             d_soc_1y = f_scale * d_soc_1y
