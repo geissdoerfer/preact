@@ -21,7 +21,7 @@ class Consumer(object):
 
 class Simulator(object):
     def __init__(
-            self, consumer, battery, dc_init=1.0):
+            self, consumer, battery, dc_init=0.5):
 
         self.battery = battery
         self.consumer = consumer
@@ -57,14 +57,18 @@ class Simulator(object):
         return e_in_real, e_out_real, self.battery.get_soc()
 
 
-def plan_capacity(eta_bat_in, eta_bat_out, e_pred):
+def plan_capacity(doys, e_ins, latitude, eta_bat_in=1.0, eta_bat_out=1.0):
 
-    budget = np.mean(e_pred)
-    e_d = e_pred - budget
-    e_d[e_d > 0] *= eta_bat_in
-    e_d[e_d < 0] /= eta_bat_out
-    soc_delta = np.cumsum(e_d)
-    return max(soc_delta) - min(soc_delta)
+    astmodel = AST(doys, e_ins, latitude)
+    e_pred = astmodel.predict(np.arange(365))
+
+    surplus = LTENO.surplus(e_pred, astmodel.d)
+    deficit = LTENO.deficit(e_pred, astmodel.d)
+
+    log.debug(
+        f'Planning capacity: surplus={surplus:.{3}}, deficit={deficit:.{3}}'
+    )
+    return (surplus + deficit) / 2
 
 
 def relative_underperformance(e_in, e_out, utility):
