@@ -12,11 +12,9 @@ log = logging.getLogger("simulator")
 
 
 class Consumer(object):
-    def __init__(self, max_consumption):
-        self.max_consumption = max_consumption
 
     def step(self, duty_cycle):
-        return duty_cycle * self.max_consumption
+        raise NotImplementedError()
 
 
 class Simulator(object):
