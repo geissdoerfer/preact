@@ -52,8 +52,6 @@ class PREACT(EnergyManager, ControlledManager):
         self.battery_capacity = battery_capacity
         self.battery_age_rate = battery_age_rate
 
-        self.duty_cycle = 0.5
-
         self.step_count = 0
 
         self.log = logging.getLogger("PREACT")
@@ -86,14 +84,14 @@ class PREACT(EnergyManager, ControlledManager):
         else:
             offset = (self.estimate_capacity() - p2p_1y) / 2
 
-        soc_target = d_soc_1y[0] + offset - min(d_soc_1y)
+        self.soc_target = d_soc_1y[0] + offset - min(d_soc_1y)
 
         self.step_count += 1
 
-        d_duty_cycle = self.soc_control(
-            self.estimate_capacity(), soc_target, soc)
-        self.duty_cycle = max(0.0, min(1.0, self.duty_cycle + d_duty_cycle))
-        return self.duty_cycle
+        duty_cycle = self.soc_control(
+            self.estimate_capacity(), self.soc_target, soc + e_pred[0])
+
+        return max(0.0, min(1.0, duty_cycle))
 
 
 class STEWMA(EnergyManager):
