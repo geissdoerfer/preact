@@ -35,18 +35,6 @@ class Battery:
 
     def charge(self, value):
 
-        self.capacity = max(0.0, self.capacity - self.age_amount)
-
-        loss = self.model_parameters['loss_rate'] * self.soc
-        if(self.soc >= loss):
-            e_wasted = self.soc
-            self.soc = self.soc-loss
-        else:
-            e_wasted = self.soc
-            self.soc = 0.0
-
-        soc_prior = self.soc
-
         if value > 0:
             value_bat = value * self.model_parameters['eta_in']
             if self.soc + value_bat > self.capacity:
@@ -56,11 +44,18 @@ class Battery:
 
         else:
             value_bat = value / self.model_parameters['eta_out']
-            if(self.soc + value_bat < 0):
+            if round(self.soc, 4) < round(abs(value_bat), 4):
+                print(self.soc, value_bat)
                 raise BatteryException("Battery undercharged")
             self.soc = self.soc + value_bat
 
-        return self.soc - soc_prior
+        self.capacity = max(0.0, self.capacity - self.age_amount)
+        if(self.capacity <= 0):
+            raise BatteryException("Battery died")
+
+        loss = self.model_parameters['loss_rate'] * self.soc
+        self.soc = max(0.0, self.soc - loss)
+
 
     def can_supply(self):
         return self.soc * self.model_parameters['eta_out']
