@@ -271,29 +271,26 @@ class MBSGD(object):
 
         eta = self.fn_eta(self.step_count)
 
-        # Calculate circular index for mini-batch buffer
-        batch_ix = (self.step_count + 1) % (self.batchsize)
         # Put current value to buffer
-        self.batch_buffer[batch_ix-1] = y_scaled
-        real_batch_size = (
-            self.step_count + 1
-            - max(0, self.step_count + 1 - self.batchsize)
-        )
+        self.batch_buffer[self.step_count % self.batchsize] = y_scaled
+
+        batch_size = min(self.batchsize, self.step_count + 1)
+        batch_idx = np.arange(x + 1 - batch_size, x + 1)
 
         # Partial derivatives
         dJs = np.zeros(len(self.params))
 
         # Iterate mini-batch
-        for i in range(batch_ix-real_batch_size, batch_ix):
+        for i in range(0, batch_size):
             # Get day by counting backwards
-            d_i = x-(batch_ix-1-i)
+            d_i = (x + 1 - batch_size) + i
             # Prediction error
             e = self.model.mfun(d_i, self.params) - self.batch_buffer[i]
             for j in range(len(self.params)):
                 dJs[j] += e * self.model.d_mfun[j](d_i, self.params)
 
         # Parameter update with momentum
-        dW = - eta*dJs/(real_batch_size) + self.momentum*self.prev_update
+        dW = - eta*dJs/(batch_size) + self.momentum*self.prev_update
         self.prev_update = dW
         self.params += dW
 
