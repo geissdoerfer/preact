@@ -130,20 +130,16 @@ class AST(object):
     def step(self, d, y):
 
         # Calculate circular index for mini-batch buffer
-        batch_ix = (self.step_count + 1) % (self.wndw_size)
+        batch_ix = (self.step_count) % (self.wndw_size)
         # Put current value to buffer
-        self.window[batch_ix-1] = y
+        self.window[self.step_count % self.wndw_size] = y
 
-        real_batch_size = (
-            self.step_count + 1
-            - max(0, (self.step_count + 1) - self.wndw_size)
-        )
+        batch_size = min(self.wndw_size, self.step_count + 1)
 
-        wndw_start = max(0, d+1-real_batch_size)
-        wndw_idx = np.arange(wndw_start, d+1)
+        wndw_idx = np.arange(d + 1 - batch_size, d + 1)
 
         self.alpha = (
-            np.mean(self.window[0:real_batch_size])
+            np.mean(self.window[0:batch_size])
             / np.mean(mfun(wndw_idx, self.p))
         )
         self.step_count += 1
