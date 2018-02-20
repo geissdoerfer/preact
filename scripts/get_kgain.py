@@ -28,6 +28,14 @@ def utility(doys):
     return np.ones(len(doys))
 
 
+class MyConsumer(enmanage.Consumer):
+    def __init__(self, max_consumption):
+        self.max_consumption = max_consumption
+
+    def step(self, duty_cycle):
+        return self.max_consumption * duty_cycle
+
+
 def simulate(
         control_coefficients, doys, e_ins, res_q):
 
@@ -41,7 +49,7 @@ def simulate(
     manager = enmanage.PREACT(
         battery.capacity, utility, control_coefficients)
 
-    consumer = enmanage.Consumer(max(e_ins))
+    consumer = MyConsumer(max(e_ins))
     simulator = enmanage.Simulator(consumer, battery)
 
     budget = np.zeros(len(doys) - TRAINING_OFFSET)
