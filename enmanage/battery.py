@@ -56,7 +56,6 @@ class Battery:
         loss = self.model_parameters['loss_rate'] * self.soc
         self.soc = max(0.0, self.soc - loss)
 
-
     def can_supply(self):
         return self.soc * self.model_parameters['eta_out']
 
