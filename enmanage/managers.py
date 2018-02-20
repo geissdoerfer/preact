@@ -95,28 +95,32 @@ class PREACT(EnergyManager, ControlledManager):
 
 
 class STEWMA(EnergyManager):
-    def __init__(self, e_out_max):
+    def __init__(self, e_baseline, e_out_max, loss_rate):
         self.e_out_max = e_out_max
+        self.e_baseline = e_baseline
+        self.loss_rate = loss_rate
 
-    def calc_duty_cycle(self, e_pred):
-        return e_pred / self.e_out_max
+    def calc_duty_cycle(self, soc, e_pred):
+        dc = (e_pred - self.e_baseline - self.loss_rate * soc) / self.e_out_max
+        return max(0.0, min(1.0, dc))
 
 
 class LTENO(EnergyManager):
     def __init__(
-            self, e_out_max, battery_capacity, d,
+            self, e_baseline, e_out_max, battery_capacity, d,
             eta_bat_in=1.0, eta_bat_out=1.0):
 
         # Scale from nominal capacity
         self.battery_capacity = battery_capacity * eta_bat_out
         self.e_out_max = e_out_max
+        self.e_baseline = e_baseline
         self.eta_bat_in = eta_bat_in
         self.d = d
 
         self.log = logging.getLogger("LT-ENO")
         self.log.debug(f'capacity: {self.battery_capacity:.{3}}')
 
-    def calc_duty_cycle(self, e_pred, alpha):
+    def calc_duty_cycle(self, soc, e_pred, alpha):
 
         e_pred = e_pred * self.eta_bat_in
         d = copy.copy(self.d)
@@ -148,9 +152,12 @@ class LTENO(EnergyManager):
                 surplus = LTENO.surplus(e_pred, d)
                 break
 
-        duty_cycle = e_pred[d[1] % 365] / self.e_out_max
-        self.log.debug(f'd1={d[1]} dutycycle={duty_cycle:.{3}}')
-        return duty_cycle
+        dc = (
+            (e_pred[d[1] % 365] - self.e_baseline)
+            / self.e_out_max
+        )
+        self.log.debug(f'd1={d[1]} dutycycle={dc:.{3}}')
+        return max(0.0, min(1.0, dc))
 
     @staticmethod
     def deficit(e_pred, d):
