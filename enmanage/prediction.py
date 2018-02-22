@@ -68,6 +68,12 @@ def mfun_d_b(d, params):
             )
 
 
+class Model:
+    def __init__(self, mfun, d_mfun):
+        self.mfun = mfun
+        self.d_mfun = d_mfun
+
+
 def fit_optimal(ds, ys, model):
 
     def constr_lat(params):
@@ -96,7 +102,16 @@ def fit_optimal(ds, ys, model):
     return res.x
 
 
-class AST(object):
+class EnergyPredictor(object):
+
+    def update(self):
+        raise NotImplementedError()
+
+    def predict(self):
+        raise NotImplementedError()
+
+
+class AST(EnergyPredictor):
     def __init__(self, t_training, e_in_training, latitude, window_size=63):
 
         def mfun_fixlat(lat):
@@ -127,7 +142,7 @@ class AST(object):
         )
         self.d[1] = np.argmax(sign_changes < 0) + self.d[0]
 
-    def step(self, d, y):
+    def update(self, d, y):
 
         # Calculate circular index for mini-batch buffer
         batch_ix = (self.step_count) % (self.wndw_size)
@@ -148,14 +163,14 @@ class AST(object):
         return self.alpha * mfun(d, self.p)
 
 
-class CLAIRVOYANT(object):
+class CLAIRVOYANT(EnergyPredictor):
 
     def __init__(self, y_real, scale=1.0):
 
         self.y_real = y_real
         self.step_count = 0
 
-    def step(self, x, y):
+    def update(self, x, y):
         self.step_count += 1
 
     def predict(self, x):
@@ -166,7 +181,7 @@ class CLAIRVOYANT(object):
             return self.y_real[self.step_count + 1]
 
 
-class OPTMODEL(object):
+class OPTMODEL(EnergyPredictor):
 
     def __init__(self, x_real, y_real, scale):
 
@@ -181,14 +196,11 @@ class OPTMODEL(object):
             model
         )
 
-    def step(self, x, y):
-        pass
-
     def predict(self, x):
         return mfun(x, self.params) * self.scale
 
 
-class SGD(object):
+class SGD(EnergyPredictor):
     @staticmethod
     def fn_eta(d):
         return 1.5/(d+0.5)
@@ -211,7 +223,7 @@ class SGD(object):
 
         self.step_count = 0
 
-    def step(self, x, y):
+    def update(self, x, y):
 
         y_scaled = y/self.scale
 
@@ -235,7 +247,7 @@ class SGD(object):
         return mfun(x, self.params) * self.scale
 
 
-class MBSGD(object):
+class MBSGD(EnergyPredictor):
     @staticmethod
     def fn_eta(d):
         return 3.0/(1 + d/0.5)
@@ -265,7 +277,7 @@ class MBSGD(object):
 
         self.scale = scale
 
-    def step(self, x, y):
+    def update(self, x, y):
 
         y_scaled = y/self.scale
 
@@ -304,19 +316,13 @@ class MBSGD(object):
         return mfun(x, self.params)*self.scale
 
 
-class EWMA(object):
+class EWMA(EnergyPredictor):
     def __init__(self, alpha=0.5):
         self.alpha = 0.5
         self.buffer = 0.0
 
-    def step(self, y):
+    def update(self, x, y):
         self.buffer = self.alpha * y + (1.0 - self.alpha) * self.buffer
 
     def predict(self):
         return self.buffer
-
-
-class Model:
-    def __init__(self, mfun, d_mfun):
-        self.mfun = mfun
-        self.d_mfun = d_mfun
