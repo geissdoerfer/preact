@@ -42,12 +42,11 @@ def simulate(
     predictor = enmanage.MBSGD(scale=PWR_FACTOR)
 
     for i in range(TRAINING_OFFSET):
-        predictor.step(doys[i], e_ins[i])
-        e_ins_pred = predictor.predict(doys)
+        predictor.update(doys[i], e_ins[i])
 
     battery = enmanage.Battery(CAPACITY, INIT_SOC)
     manager = enmanage.PREACT(
-        battery.capacity, utility, control_coefficients)
+        predictor, battery.capacity, utility, control_coefficients)
 
     consumer = MyConsumer(max(e_ins))
     simulator = enmanage.Simulator(consumer, battery)
@@ -57,9 +56,9 @@ def simulate(
     for i in range(TRAINING_OFFSET, len(doys)):
         e_in_real, budget[i-TRAINING_OFFSET], soc = simulator.step(
             doys[i], e_ins[i])
-        predictor.step(doys[i], e_in_real)
-        e_pred = predictor.predict(np.arange(doys[i] + 1, doys[i] + 1 + 365))
-        duty_cycle = manager.calc_duty_cycle(doys[i], soc, e_pred)
+        predictor.update(doys[i], e_in_real)
+
+        duty_cycle = manager.step(doys[i], soc)
         simulator.set_duty_cycle(duty_cycle)
 
     rup = enmanage.relative_underperformance(

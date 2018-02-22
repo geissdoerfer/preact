@@ -15,91 +15,69 @@ def eval_budget(doy, e_in, budget):
     assert(efficiency > 0.0)
 
 
-def test_lteno(eval_data, simulator, training_data, fxt_dataset):
+def test_manager(request, manager, consumer, battery, eval_data):
 
-    predictor = enmanage.AST(
-        training_data['doy'], training_data['e_in'], fxt_dataset['latitude'])
-
-    en_manager = enmanage.LTENO(
-        max(eval_data['e_in']),
-        simulator.battery.capacity,
-        predictor.d,
-        simulator.battery.get_eta_in(),
-        simulator.battery.get_eta_out()
-    )
-
-    budget = np.zeros(len(eval_data['doy']))
-    for i, (doy, e_in) in enumerate(
-            zip(eval_data['doy'], eval_data['e_in'])):
-
-        e_in_real, budget[i], _ = simulator.step(doy, e_in)
-
-        predictor.step(doy, e_in_real)
-        e_pred = predictor.predict(np.arange(365))
-
-        duty_cycle = en_manager.calc_duty_cycle(e_pred, predictor.alpha)
-        simulator.set_duty_cycle(duty_cycle)
-
-    eval_budget(eval_data['doy'], eval_data['e_in'], budget)
-
-
-def test_preact(eval_data, simulator, predictor):
-
-    en_manager = enmanage.PREACT(
-        simulator.battery.capacity,
-        enmanage.profiles['uniform']
-    )
-
-    budget = np.zeros(len(eval_data['doy']))
-    for i, (doy, e_in) in enumerate(
-            zip(eval_data['doy'], eval_data['e_in'])):
-
-        e_in_real, budget[i], soc = simulator.step(doy, e_in)
-
-        predictor.step(doy, e_in_real)
-        e_pred = predictor.predict(np.arange(doy + 1, doy + 1 + 365))
-
-        duty_cycle = en_manager.calc_duty_cycle(doy, soc, e_pred)
-        simulator.set_duty_cycle(duty_cycle)
-
-    eval_budget(eval_data['doy'], eval_data['e_in'], budget)
-
-
-def test_stewma(eval_data, simulator):
-
-    predictor = enmanage.EWMA()
-
-    en_manager = enmanage.STEWMA(
-        max(eval_data['e_in'])
-    )
-
-    budget = np.zeros(len(eval_data['doy']))
-    for i, (doy, e_in) in enumerate(
-            zip(eval_data['doy'], eval_data['e_in'])):
-
-        e_in_real, budget[i], soc = simulator.step(doy, e_in)
-
-        predictor.step(e_in_real)
-        e_pred = predictor.predict()
-
-        duty_cycle = en_manager.calc_duty_cycle(e_pred)
-        simulator.set_duty_cycle(duty_cycle)
-
-    eval_budget(eval_data['doy'], eval_data['e_in'], budget)
-
-
-@pytest.fixture()
-def predictor(fxt_dataset):
-    e_in = (
-        fxt_dataset['data']['exposure'].as_matrix()[365:] * enmanage.PWR_FACTOR
-    )
-    return enmanage.CLAIRVOYANT(e_in)
-
-
-@pytest.fixture()
-def simulator(eval_data, predictor):
-    consumer = enmanage.Consumer(max(eval_data['e_in']))
-    battery = enmanage.Battery(3500.0 * enmanage.CAP_FACTOR, 0.5)
     simulator = enmanage.Simulator(consumer, battery)
 
-    return simulator
+    budget = np.zeros(len(eval_data['doy']))
+    for i, (doy, e_in) in enumerate(
+            zip(eval_data['doy'], eval_data['e_in'])):
+
+        e_in_real, budget[i], soc = simulator.step(doy, e_in)
+
+        manager.predictor.update(doy, e_in_real)
+
+        duty_cycle = manager.step(doy, soc)
+        simulator.set_duty_cycle(duty_cycle)
+
+    eval_budget(eval_data['doy'], eval_data['e_in'], budget)
+
+
+@pytest.fixture(params=['LT-ENO', 'PREACT', 'ST-EWMA'])
+def manager(request, battery, consumer, training_data, fxt_dataset):
+    if(request.param == 'LT-ENO'):
+        predictor = enmanage.AST(
+            training_data['doy'],
+            training_data['e_in'],
+            fxt_dataset['latitude'])
+
+        en_manager = enmanage.LTENO(
+            predictor,
+            consumer,
+            battery.capacity,
+            battery.get_eta_in(),
+            battery.get_eta_out()
+        )
+    elif(request.param == 'PREACT'):
+        e_in = (
+            fxt_dataset['data']['exposure'].as_matrix()[365:]
+            * enmanage.PWR_FACTOR
+        )
+        predictor = enmanage.CLAIRVOYANT(e_in)
+
+        en_manager = enmanage.PREACT(
+            predictor,
+            battery.capacity,
+            enmanage.profiles['uniform']
+        )
+
+    elif(request.param == 'ST-EWMA'):
+        predictor = enmanage.EWMA()
+
+        en_manager = enmanage.STEWMA(
+            predictor,
+            consumer
+        )
+
+    return en_manager
+
+
+@pytest.fixture
+def consumer(eval_data):
+    return enmanage.Consumer(max(eval_data['e_in']))
+
+
+@pytest.fixture
+def battery(consumer):
+    battery = enmanage.Battery(3500.0 * enmanage.CAP_FACTOR, 0.5)
+    return battery

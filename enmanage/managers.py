@@ -3,16 +3,26 @@ from scipy.optimize import minimize, curve_fit
 import copy
 import logging
 
-from .prediction import MBSGD, AST
+from .prediction import EnergyPredictor
 from .profiles import profiles
 from . import constants as C
 
 
-class EnergyManager:
-    pass
+class EnergyManager(object):
+
+    def calc_duty_cycle(self, *args):
+        pass
 
 
-class ControlledManager:
+class PredictiveManager(EnergyManager):
+    def __init__(self, predictor):
+        self.predictor = predictor
+
+    def step(self, doy, soc):
+        raise NotImplementedError()
+
+
+class PIDController:
     def __init__(self, coefficients=None):
         self.e_sum = 0.0
         self.e_prev = 0.0
@@ -25,28 +35,30 @@ class ControlledManager:
         if coefficients:
             self.coefficients.update(coefficients)
 
-    def soc_control(self, capacity, soc_target, soc):
+    def calculate(self, set_point, process_variable):
 
-        e = (soc - soc_target) / capacity
+        e = (process_variable - set_point)
         self.e_sum += e
         e_d = e - self.e_prev
         self.e_prev = e
 
-        dc = (
+        output = (
             self.coefficients['k_p'] * e
             + self.coefficients['k_i'] * self.e_sum
             + self.coefficients['k_d'] * e_d
         )
 
-        return dc
+        return output
 
 
-class PREACT(EnergyManager, ControlledManager):
+class PREACT(PredictiveManager):
     def __init__(
-            self, battery_capacity, utility_function,
+            self, predictor, battery_capacity, utility_function,
             control_coefficients=None, battery_age_rate=0.0):
 
-        ControlledManager.__init__(self, control_coefficients)
+        PredictiveManager.__init__(self, predictor)
+
+        self.controller = PIDController(control_coefficients)
 
         self.utility_function = utility_function
         self.battery_capacity = battery_capacity
@@ -55,6 +67,13 @@ class PREACT(EnergyManager, ControlledManager):
         self.step_count = 0
 
         self.log = logging.getLogger("PREACT")
+
+    def step(self, doy, soc):
+        e_pred = self.predictor.predict(
+            np.arange(doy + 1, doy + 1 + 365))
+
+        duty_cycle = self.calc_duty_cycle(doy, soc, e_pred)
+        return duty_cycle
 
     def estimate_capacity(self, offset=0):
         return (
@@ -73,9 +92,7 @@ class PREACT(EnergyManager, ControlledManager):
         d_soc_1y = np.cumsum(e_d_1y)
         p2p_1y = max(d_soc_1y)-min(d_soc_1y)
 
-        min_capacity_1y = self.estimate_capacity(365)
-
-        f_scale = min(1.0, min_capacity_1y / p2p_1y)
+        f_scale = min(1.0, self.estimate_capacity(365) / p2p_1y)
 
         offset = (self.estimate_capacity() - f_scale * p2p_1y) / 2
 
@@ -83,37 +100,59 @@ class PREACT(EnergyManager, ControlledManager):
 
         self.step_count += 1
 
-        duty_cycle = self.soc_control(
-            self.estimate_capacity(), self.soc_target, soc + e_pred[0])
+        duty_cycle = self.controller.calculate(
+            self.soc_target / self.battery_capacity,
+            (soc + e_pred[0]) / self.battery_capacity
+        )
 
         return max(0.0, min(1.0, duty_cycle))
 
 
-class STEWMA(EnergyManager):
-    def __init__(self, e_baseline, e_out_max, loss_rate):
-        self.e_out_max = e_out_max
-        self.e_baseline = e_baseline
+class STEWMA(PredictiveManager):
+    def __init__(self, predictor, consumer, loss_rate=0.0):
+
+        PredictiveManager.__init__(self, predictor)
+
+        self.consumer = consumer
         self.loss_rate = loss_rate
 
+    def step(self, doy, soc):
+        e_pred = self.predictor.predict()
+
+        duty_cycle = self.calc_duty_cycle(soc, e_pred)
+        return duty_cycle
+
     def calc_duty_cycle(self, soc, e_pred):
-        dc = (e_pred - self.e_baseline - self.loss_rate * soc) / self.e_out_max
+        dc = (
+            (e_pred - self.loss_rate * soc - self.consumer.consume(0.0))
+            / self.consumer.consume(1.0)
+        )
         return max(0.0, min(1.0, dc))
 
 
-class LTENO(EnergyManager):
+class LTENO(PredictiveManager):
     def __init__(
-            self, e_baseline, e_out_max, battery_capacity, d,
+            self, predictor, consumer, battery_capacity,
             eta_bat_in=1.0, eta_bat_out=1.0):
+
+        PredictiveManager.__init__(self, predictor)
 
         # Scale from nominal capacity
         self.battery_capacity = battery_capacity * eta_bat_out
-        self.e_out_max = e_out_max
-        self.e_baseline = e_baseline
+        self.consumer = consumer
+
         self.eta_bat_in = eta_bat_in
-        self.d = d
+        self.d = predictor.d
 
         self.log = logging.getLogger("LT-ENO")
         self.log.debug(f'capacity: {self.battery_capacity:.{3}}')
+
+    def step(self, doy, soc):
+        e_pred = self.predictor.predict(np.arange(365))
+
+        duty_cycle = self.calc_duty_cycle(
+            soc, e_pred, self.predictor.alpha)
+        return duty_cycle
 
     def calc_duty_cycle(self, soc, e_pred, alpha):
 
@@ -148,8 +187,8 @@ class LTENO(EnergyManager):
                 break
 
         dc = (
-            (e_pred[d[1] % 365] - self.e_baseline)
-            / self.e_out_max
+            (e_pred[d[1] % 365] - self.consumer.consume(0.0))
+            / self.consumer.consume(1.0)
         )
         self.log.debug(f'd1={d[1]} dutycycle={dc:.{3}}')
         return max(0.0, min(1.0, dc))
@@ -173,9 +212,10 @@ class LTENO(EnergyManager):
         return surplus
 
 
-class OptimalManager(EnergyManager, ControlledManager):
+class OptimalManager(EnergyManager):
     def __init__(self, t, e_ins, utility_function):
-        ControlledManager.__init__(self)
+
+        self.controller = PIDController()
 
         def get_soc_delta(p, e_in):
             return np.cumsum(e_in - p)
