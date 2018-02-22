@@ -73,18 +73,13 @@ class PREACT(EnergyManager, ControlledManager):
         d_soc_1y = np.cumsum(e_d_1y)
         p2p_1y = max(d_soc_1y)-min(d_soc_1y)
 
-        min_capacity_1y = min(self.estimate_capacity(np.arange(365)))
+        min_capacity_1y = self.estimate_capacity(365)
 
-        f_scale = min_capacity_1y / p2p_1y
+        f_scale = min(1.0, min_capacity_1y / p2p_1y)
 
-        if(f_scale < 1.0):
-            d_soc_1y = f_scale * d_soc_1y
-            offset = (self.estimate_capacity() - f_scale * p2p_1y) / 2
+        offset = (self.estimate_capacity() - f_scale * p2p_1y) / 2
 
-        else:
-            offset = (self.estimate_capacity() - p2p_1y) / 2
-
-        self.soc_target = d_soc_1y[0] + offset - min(d_soc_1y)
+        self.soc_target = f_scale * (d_soc_1y[0] - min(d_soc_1y)) + offset
 
         self.step_count += 1
 
