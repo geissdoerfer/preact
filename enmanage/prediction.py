@@ -238,7 +238,7 @@ class SGD(object):
 class MBSGD(object):
     @staticmethod
     def fn_eta(d):
-        return 1.5/(d+0.5)
+        return 3.0/(1 + d/0.5)
 
     def __init__(
             self, scale=1.0, fn_eta=None, batchsize=1, momentum=0.375,
@@ -297,11 +297,8 @@ class MBSGD(object):
         self.step_count += 1
 
         # Make sure latitude is within [-pi;pi]
-        p_tmp = self.params[1] + np.pi
-        if(p_tmp > 2*np.pi) or (p_tmp < 0.0):
-            p_tmp = p_tmp % (2*np.pi)
-
-        self.params[1] = p_tmp - np.pi
+        if(self.params[1] > np.pi) or (self.params[1] < np.pi):
+            self.params[1] = ((self.params[1] + np.pi) % (2*np.pi)) - np.pi
 
     def predict(self, x):
         return mfun(x, self.params)*self.scale
