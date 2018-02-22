@@ -17,18 +17,11 @@ def eval_budget(doy, e_in, budget):
 
 def test_manager(request, manager, consumer, battery, eval_data):
 
-    simulator = enmanage.Simulator(consumer, battery)
+    simulator = enmanage.Simulator(
+        manager, manager.predictor, consumer, battery)
 
-    budget = np.zeros(len(eval_data['doy']))
-    for i, (doy, e_in) in enumerate(
-            zip(eval_data['doy'], eval_data['e_in'])):
-
-        e_in_real, budget[i], soc = simulator.step(doy, e_in)
-
-        manager.predictor.update(doy, e_in_real)
-
-        duty_cycle = manager.step(doy, soc)
-        simulator.set_duty_cycle(duty_cycle)
+    soc, budget, duty_cycle = simulator.run(
+        eval_data['doy'], eval_data['e_in'])
 
     eval_budget(eval_data['doy'], eval_data['e_in'], budget)
 
