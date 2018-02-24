@@ -1,0 +1,27 @@
+battery:
+    capacity_mah: 2800.0
+    soc_init: 0.5
+    model_parameters:
+        eta_in: 1.0
+        eta_out: 1.0
+        loss_rate: 0.0
+        age_rate: 0.0
+    estimation_errors:
+        etas: 0.0
+        age_rate: 0.0
+        loss_rate: 0.0
+        soc:
+            mean: 0.0
+            std: 0.0
+consumer:
+    e_baseline: 0.0
+    e_max_active: 1.0
+
+harvesting:
+    a_panel: 0.003500.0
+    eta_vc_in: .75
+    eta_panel: 0.025
+    voltage: 3.0
+
+simulator:
+    dc_init: 0.5

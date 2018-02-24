@@ -16,12 +16,8 @@ log = logging.getLogger("kgain")
 
 BASE_PATH = Path(__file__).resolve().parent.parent
 
-CAPACITY = 4522.7 * enmanage.CAP_FACTOR
-PWR_FACTOR = enmanage.PWR_FACTOR
-
+CAPACITY = 4522.7
 TRAINING_OFFSET = 120
-
-INIT_SOC = 0.5
 
 
 def utility(doys):
@@ -31,25 +27,27 @@ def utility(doys):
 def simulate(
         control_coefficients, doys, e_ins, res_q):
 
-    predictor = enmanage.MBSGD(scale=PWR_FACTOR)
+    config = {
+        'battery': {
+            'capacity_mah': CAPACITY
+        }
+    }
+    pwr_factor = enmanage.Simulator.calc_pwr_factor(config_dict=config)
+    config['consumer'] = {'e_max_active': max(e_ins) * pwr_factor}
 
-    for i in range(TRAINING_OFFSET):
-        predictor.update(doys[i], e_ins[i])
+    simulator = enmanage.Simulator.from_config(
+        enmanage.PREACT,
+        {'control_coefficients': control_coefficients},
+        config_dict=config
+    )
 
-    battery = enmanage.Battery(CAPACITY, INIT_SOC)
-    manager = enmanage.PREACT(
-        predictor, battery.capacity, utility, control_coefficients)
-
-    consumer = enmanage.Consumer(max(e_ins))
-    simulator = enmanage.Simulator(manager, predictor, consumer, battery)
-
-    budget = np.zeros(len(doys) - TRAINING_OFFSET)
-
-    _, budget, _ = simulator.run(
-        doys[TRAINING_OFFSET:], e_ins[TRAINING_OFFSET:])
+    _, budget, _ = simulator.run(doys, e_ins)
 
     rup = enmanage.relative_underperformance(
-        e_ins[TRAINING_OFFSET:], budget, utility(doys[TRAINING_OFFSET:]))
+        e_ins[TRAINING_OFFSET:] * simulator.pwr_factor,
+        budget[TRAINING_OFFSET:],
+        utility(doys[TRAINING_OFFSET:])
+    )
 
     res_q.put(rup)
 
@@ -61,9 +59,9 @@ def run(ks):
     res_q = multiprocessing.Queue()
     jobs = list()
 
-    for location_code in ['A_MRA', 'B_ASP', 'C_BLN']:
+    for location_code in ['A_MRA', 'B_ASP', 'C_BLN', 'D_HBN', 'E_IJK']:
         dataset = get_dataset(location_code)
-        e_ins = dataset['data']['exposure'].as_matrix()[:3*365] * PWR_FACTOR
+        e_ins = dataset['data']['exposure'].as_matrix()[:3*365]
         doys = np.array(dataset['data'].index.dayofyear)[:3*365]
 
         p = multiprocessing.Process(
@@ -73,6 +71,7 @@ def run(ks):
 
         p.start()
         jobs.append(p)
+        p.join()
 
     for p in jobs:
         p.join()
@@ -91,7 +90,7 @@ def run(ks):
 def nm_optimize(maxiter):
 
     simplex_init = np.array(
-        [[0.0, 0.0, 0.0], [.1, 0.0, 0.0], [0.0, .1, 0.0],
+        [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, .1, 0.0],
          [0.0, 0.0, .1]]
     )
     res = minimize(

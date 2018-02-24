@@ -112,18 +112,23 @@ class EnergyPredictor(object):
 
 
 class AST(EnergyPredictor):
-    def __init__(self, t_training, e_in_training, latitude, window_size=63):
+    def __init__(self, **kwargs):
 
         def mfun_fixlat(lat):
             def mfun_a(d, a):
                 return mfun(d, (a, lat))
             return mfun_a
-        popt, copt = curve_fit(
-            mfun_fixlat(latitude), t_training, e_in_training)
 
-        self.p = [popt[0], latitude]
-        self.window = np.zeros(window_size)
-        self.wndw_size = window_size
+        popt, copt = curve_fit(
+            mfun_fixlat(kwargs['latitude']),
+            kwargs['training_data']['doy'],
+            kwargs['training_data']['e_in']
+        )
+
+        self.p = [popt[0], kwargs['latitude']]
+        self.window_size = kwargs.get('window_size', 63)
+        self.window = np.zeros(self.window_size)
+
         self.alpha = 1.0
 
         self.step_count = 0
@@ -145,11 +150,11 @@ class AST(EnergyPredictor):
     def update(self, d, y):
 
         # Calculate circular index for mini-batch buffer
-        batch_ix = (self.step_count) % (self.wndw_size)
+        batch_ix = (self.step_count) % (self.window_size)
         # Put current value to buffer
-        self.window[self.step_count % self.wndw_size] = y
+        self.window[self.step_count % self.window_size] = y
 
-        batch_size = min(self.wndw_size, self.step_count + 1)
+        batch_size = min(self.window_size, self.step_count + 1)
 
         wndw_idx = np.arange(d + 1 - batch_size, d + 1)
 
@@ -252,28 +257,18 @@ class MBSGD(EnergyPredictor):
     def fn_eta(d):
         return 3.0/(1 + d/0.5)
 
-    def __init__(
-            self, scale=1.0, fn_eta=None, batchsize=1, momentum=0.375,
-            params_init=None):
+    def __init__(self, scale=1.0, **kwargs):
 
-        if fn_eta is None:
-            self.fn_eta = MBSGD.fn_eta
-        else:
-            self.fn_eta = fn_eta
-
-        self.momentum = momentum
-        self.batchsize = batchsize
-
-        if params_init is None:
-            self.params = np.zeros(2)
-        else:
-            self.params = params_init
+        self.fn_eta = kwargs.get('fn_eta', MBSGD.fn_eta)
+        self.batchsize = kwargs.get('batchsize', 1)
+        self.momentum = kwargs.get('momentum', 0.375)
+        self.params = kwargs.get('params_init', np.zeros(2))
 
         self.model = Model(mfun, (mfun_d_a, mfun_d_b))
 
         self.step_count = 0
         self.prev_update = np.zeros(2)
-        self.batch_buffer = np.zeros(batchsize)
+        self.batch_buffer = np.zeros(self.batchsize)
 
         self.scale = scale
 
@@ -317,8 +312,8 @@ class MBSGD(EnergyPredictor):
 
 
 class EWMA(EnergyPredictor):
-    def __init__(self, alpha=0.5):
-        self.alpha = 0.5
+    def __init__(self, **kwargs):
+        self.alpha = kwargs.get('alpha', 0.5)
         self.buffer = 0.0
 
     def update(self, x, y):

@@ -16,9 +16,12 @@ setup(
     license=license,
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],
+    include_package_data=True,
     install_requires=[
        'numpy',
-       'scipy'
+       'scipy',
+       'pyyaml',
+       'matplotlib'
     ],
     packages=find_packages(exclude=('tests', 'docs', 'scripts', 'data'))
 )

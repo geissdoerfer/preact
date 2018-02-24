@@ -53,14 +53,20 @@ class PIDController:
 
 class PREACT(PredictiveManager):
     def __init__(
-            self, predictor, battery_capacity, utility_function,
-            control_coefficients=None, battery_age_rate=0.0):
+            self, predictor, battery_capacity, battery_age_rate=0.0, **kwargs):
 
         PredictiveManager.__init__(self, predictor)
 
-        self.controller = PIDController(control_coefficients)
+        self.controller = PIDController(
+            kwargs.get('control_coefficients', None))
 
-        self.utility_function = utility_function
+        if('utility_function' in kwargs.keys()):
+            self.utility_function = kwargs['utility_function']
+        else:
+            def utility(doy):
+                return np.ones(len(doy))
+            self.utility_function = utility
+
         self.battery_capacity = battery_capacity
         self.battery_age_rate = battery_age_rate
 

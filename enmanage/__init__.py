@@ -1,5 +1,8 @@
 import numpy as np
 import logging
+import yaml
+import collections
+from pkg_resources import Requirement, resource_filename
 
 from .battery import Battery
 from .profiles import profiles
@@ -7,21 +10,32 @@ from .managers import PREACT, LTENO, STEWMA
 from .prediction import EWMA, MBSGD, AST, SGD, OPTMODEL, CLAIRVOYANT
 from .constants import *
 
-
+base_cfg_path = resource_filename(__name__, "simulator_config.yml")
 log = logging.getLogger("simulator")
 
 
+def dict_merge(dct, merge_dct):
+    for k, v in merge_dct.items():
+        if (k in dct and isinstance(dct[k], dict)
+                and isinstance(merge_dct[k], collections.Mapping)):
+            dict_merge(dct[k], merge_dct[k])
+        else:
+            dct[k] = merge_dct[k]
+
+
 class Consumer(object):
-    def __init__(self, max_consumption):
-        self.max_consumption = max_consumption
+    def __init__(self, e_max_active, e_baseline=0.0):
+        self.e_max_active = e_max_active
+        self.e_baseline = e_baseline
 
     def consume(self, duty_cycle):
-        return duty_cycle * self.max_consumption
+        return self.e_baseline + duty_cycle * self.e_max_active
 
 
 class Simulator(object):
     def __init__(
-            self, manager, predictor, consumer, battery, dc_init=0.5):
+            self, manager, predictor, consumer, battery, dc_init=0.5,
+            pwr_factor=1.0):
 
         self.battery = battery
         self.consumer = consumer
@@ -29,6 +43,121 @@ class Simulator(object):
         self.manager = manager
 
         self.next_duty_cycle = dc_init
+        self.pwr_factor = pwr_factor
+
+    @staticmethod
+    def get_config(config_path=None, config_dict={}):
+
+        with open(base_cfg_path, 'r') as stream:
+            base_config = yaml.load(stream)
+
+        if config_path is not None:
+            with open(config_path, 'r') as stream:
+                config = yaml.load(stream)
+
+            dict_merge(base_config, config)
+
+        dict_merge(base_config, config_dict)
+        return base_config
+
+    @classmethod
+    def calc_pwr_factor(cls, config_path=None, config_dict={}):
+        config = cls.get_config(config_path, config_dict)
+
+        pwr_factor = (
+            config['harvesting']['a_panel']
+            * config['harvesting']['eta_vc_in']
+            * config['harvesting']['eta_panel']
+            * 1000.0
+        )
+        return pwr_factor
+
+    @classmethod
+    def plan_capacity(
+            cls, doys, e_ins, latitude, config_path=None, config_dict={}):
+        config = cls.get_config(config_path, config_dict)
+
+        pwr_factor = cls.calc_pwr_factor(config_dict=config)
+
+        astmodel = AST(
+            training_data={'doy': doys, 'e_in': e_ins * pwr_factor},
+            latitude=latitude
+        )
+        e_pred = astmodel.predict(np.arange(365))
+
+        surplus = LTENO.surplus(e_pred, astmodel.d)
+        deficit = LTENO.deficit(e_pred, astmodel.d)
+
+        capacity_mah = (
+            (surplus + deficit) / 2
+            / config['harvesting']['voltage']
+            * 1000
+        )
+
+        return capacity_mah
+
+    @classmethod
+    def from_config(
+            cls, manager_cls, manager_args={},
+            predictor_args={}, config_path=None, config_dict={}):
+
+        config = cls.get_config(config_path, config_dict)
+
+        pwr_factor = cls.calc_pwr_factor(config_dict=config)
+
+        capacity_wh = (
+            config['battery']['capacity_mah']
+            * config['harvesting']['voltage']
+            / 1000
+        )
+
+        battery = Battery(
+            capacity_wh,
+            config['battery']['soc_init'],
+            config['battery']['model_parameters'],
+            config['battery']['estimation_errors']
+        )
+
+        consumer = Consumer(
+            config['consumer']['e_max_active'],
+            config['consumer']['e_baseline']
+        )
+
+        if(manager_cls is LTENO):
+            predictor_args['training_data']['e_in'] *= pwr_factor
+            predictor = AST(**predictor_args)
+
+            manager = LTENO(
+                predictor,
+                consumer,
+                battery.capacity,
+                battery.get_eta_in(),
+                battery.get_eta_out()
+            )
+        elif(manager_cls == PREACT):
+            predictor = MBSGD(pwr_factor)
+
+            manager = PREACT(
+                predictor,
+                battery.capacity,
+                battery.get_age_rate(),
+                **manager_args
+            )
+
+        elif(manager_cls == STEWMA):
+            predictor = EWMA()
+
+            manager = STEWMA(
+                predictor,
+                consumer,
+                battery.get_loss_rate()
+            )
+
+        return cls(
+            manager, predictor, consumer, battery,
+            config['simulator']['dc_init'],
+            pwr_factor
+        )
 
     def simulate_consumption(self, e_in, duty_cycle):
         e_out = self.consumer.consume(duty_cycle)
@@ -61,7 +190,7 @@ class Simulator(object):
     def step(self, doy, e_in):
 
         e_in_real, e_out_real, duty_cycle_real = self.simulate_consumption(
-            e_in, self.next_duty_cycle)
+            e_in * self.pwr_factor, self.next_duty_cycle)
 
         self.next_duty_cycle = self.simulate_budgeting(doy, e_in_real)
 
@@ -72,7 +201,9 @@ class Simulator(object):
             f'soc={self.battery.soc/self.battery.capacity:.{3}}'
         ))
 
-        return self.battery.soc, duty_cycle_real, e_in_real, e_out_real
+        return(
+            self.battery.soc/self.battery.capacity, duty_cycle_real,
+            e_in_real, e_out_real)
 
     def run(self, doys, e_ins):
         budget = np.zeros(len(doys))
@@ -83,20 +214,6 @@ class Simulator(object):
                 doy, e_in)
 
         return soc, budget, duty_cycle
-
-
-def plan_capacity(doys, e_ins, latitude, eta_bat_in=1.0, eta_bat_out=1.0):
-
-    astmodel = AST(doys, e_ins, latitude)
-    e_pred = astmodel.predict(np.arange(365))
-
-    surplus = LTENO.surplus(e_pred, astmodel.d)
-    deficit = LTENO.deficit(e_pred, astmodel.d)
-
-    log.debug(
-        f'Planning capacity: surplus={surplus:.{3}}, deficit={deficit:.{3}}'
-    )
-    return (surplus + deficit) / 2
 
 
 def relative_underperformance(e_in, e_out, utility):

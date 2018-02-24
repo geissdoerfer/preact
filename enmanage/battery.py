@@ -23,7 +23,7 @@ class Battery:
             'etas': 0.0,
             'age_rate': 0.0,
             'loss_rate': 0.0,
-            'soc': (0.0, 0.0)
+            'soc': {'mean': 0.0, 'std': 0.0}
         }
         if estimation_errors:
             self.estimation_errors.update(estimation_errors)
@@ -80,6 +80,6 @@ class Battery:
 
     def get_soc(self):
         return (self.soc
-                * ((1.0 + (self.estimation_errors['soc'][0]
-                   + np.random.randn()*self.estimation_errors['soc'][1])
+                * ((1.0 + (self.estimation_errors['soc']['mean']
+                   + np.random.randn()*self.estimation_errors['soc']['std'])
                    / 100.0)))
