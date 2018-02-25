@@ -218,6 +218,12 @@ class Simulator(object):
         return soc, budget, duty_cycle
 
 
+def effectiveness(doys, e_ins, e_outs, utility):
+
+    e_ideal = utility(doys) / np.mean(utility(doys)) * np.mean(e_ins)
+    return np.mean(np.minimum(e_ideal, e_outs)) / np.mean(e_ins)
+
+
 def relative_underperformance(e_in, e_out, utility):
 
     e_tmp = e_out - (utility / np.mean(utility) * np.mean(e_in))
