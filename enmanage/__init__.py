@@ -2,6 +2,7 @@ import numpy as np
 import logging
 import yaml
 import collections
+import copy
 from pkg_resources import Requirement, resource_filename
 
 from .battery import Battery
@@ -124,6 +125,7 @@ class Simulator(object):
         )
 
         if(manager_cls is LTENO):
+            predictor_args = copy.deepcopy(predictor_args)
             predictor_args['training_data']['e_in'] *= pwr_factor
             predictor = AST(**predictor_args)
 
