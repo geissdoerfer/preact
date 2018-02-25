@@ -93,7 +93,7 @@ class Simulator(object):
             (surplus + deficit) / 2
             / config['harvesting']['voltage']
             * 1000
-        )
+        ) * config['battery']['model_parameters']['eta_out']
 
         return capacity_mah
 
