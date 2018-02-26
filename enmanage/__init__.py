@@ -137,7 +137,9 @@ class Simulator(object):
                 battery.get_eta_out()
             )
         elif(manager_cls == PREACT):
-            predictor = MBSGD(pwr_factor)
+            predictor_args = copy.deepcopy(predictor_args)
+            predictor_args['training_data']['e_in'] *= pwr_factor
+            predictor = AST(**predictor_args)
 
             manager = PREACT(
                 predictor,
