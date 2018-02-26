@@ -97,6 +97,8 @@ class PREACT(PredictiveManager):
         d_soc_1y = np.cumsum(e_pred - f_req*e_req)
 
         p2p_1y = max(d_soc_1y)-min(d_soc_1y)
+        if(p2p_1y < self.estimate_capacity() / 10000):
+            return 1.0
 
         f_scale = min(1.0, self.estimate_capacity(365) / p2p_1y)
 
