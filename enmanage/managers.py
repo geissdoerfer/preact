@@ -7,6 +7,8 @@ from .prediction import EnergyPredictor
 from .profiles import profiles
 from . import constants as C
 
+np.seterr(all='raise')
+
 
 class EnergyManager(object):
 
@@ -89,13 +91,11 @@ class PREACT(PredictiveManager):
 
     def calc_duty_cycle(self, n, soc, e_pred):
 
-        d_1y = np.arange(n + 1, n + 1 + 365)
-
-        e_req = self.utility_function(d_1y)
+        e_req = self.utility_function(np.arange(n + 1, n + 1 + 365))
         f_req = np.mean(e_pred)/np.mean(e_req)
-        e_d_1y = e_pred - f_req*e_req
 
-        d_soc_1y = np.cumsum(e_d_1y)
+        d_soc_1y = np.cumsum(e_pred - f_req*e_req)
+
         p2p_1y = max(d_soc_1y)-min(d_soc_1y)
 
         f_scale = min(1.0, self.estimate_capacity(365) / p2p_1y)

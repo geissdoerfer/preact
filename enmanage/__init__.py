@@ -197,10 +197,11 @@ class Simulator(object):
         self.next_duty_cycle = self.simulate_budgeting(doy, e_in_real)
 
         log.debug((
-            f'e_in={e_in:.{3}} '
-            f'e_in_real={e_in_real:.{3}} '
-            f'e_out_real={e_in:.{3}} '
-            f'soc={self.battery.soc/self.battery.capacity:.{3}}'
+            f'e_in={e_in:.3} '
+            f'e_in_real={e_in_real:.3} '
+            f'e_out_real={e_out_real:.3} '
+            f'soc={self.battery.soc/self.battery.capacity:.3} '
+            f'dc={self.next_duty_cycle:.2}'
         ))
 
         return(

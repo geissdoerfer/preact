@@ -159,7 +159,7 @@ class AST(EnergyPredictor):
         wndw_idx = np.arange(d + 1 - batch_size, d + 1)
 
         self.alpha = (
-            np.mean(self.window[0:batch_size])
+            np.mean(self.window[:batch_size])
             / np.mean(mfun(wndw_idx, self.p))
         )
         self.step_count += 1
