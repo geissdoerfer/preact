@@ -184,19 +184,13 @@ class Simulator(object):
         )
         return e_in_real, e_out_real, duty_cycle_real
 
-    def simulate_budgeting(self, doy, e_in_real):
-        self.predictor.update(doy, e_in_real)
-        duty_cycle = min(
-            1.0, max(0.0, self.manager.step(doy, self.battery.get_soc()))
-        )
-        return duty_cycle
-
     def step(self, doy, e_in):
 
         e_in_real, e_out_real, duty_cycle_real = self.simulate_consumption(
             e_in * self.pwr_factor, self.next_duty_cycle)
 
-        self.next_duty_cycle = self.simulate_budgeting(doy, e_in_real)
+        self.next_duty_cycle = self.manager.calc_duty_cycle(
+            doy, e_in_real, self.battery.get_soc())
 
         log.debug((
             f'e_in={e_in:.3} '

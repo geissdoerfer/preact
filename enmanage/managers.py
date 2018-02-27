@@ -76,22 +76,20 @@ class PREACT(PredictiveManager):
 
         self.log = logging.getLogger("PREACT")
 
-    def step(self, doy, soc):
-        e_pred = self.predictor.predict(
-            np.arange(doy + 1, doy + 1 + 365))
-
-        duty_cycle = self.calc_duty_cycle(doy, soc, e_pred)
-        return duty_cycle
-
     def estimate_capacity(self, offset=0):
         return (
             self.battery_capacity
             * (1.0 - (self.step_count + offset) * self.battery_age_rate)
         )
 
-    def calc_duty_cycle(self, n, soc, e_pred):
+    def calc_duty_cycle(self, doy, e_in, soc):
 
-        e_req = self.utility_function(np.arange(n + 1, n + 1 + 365))
+        self.predictor.update(doy, e_in)
+
+        e_pred = self.predictor.predict(
+            np.arange(doy + 1, doy + 1 + 365))
+
+        e_req = self.utility_function(np.arange(doy + 1, doy + 1 + 365))
         f_req = np.mean(e_pred)/np.mean(e_req)
 
         d_soc_1y = np.cumsum(e_pred - f_req*e_req)
@@ -124,13 +122,11 @@ class STEWMA(PredictiveManager):
         self.consumer = consumer
         self.loss_rate = loss_rate
 
-    def step(self, doy, soc):
+    def calc_duty_cycle(self, doy, e_in, soc):
+
+        self.predictor.update(doy, e_in)
         e_pred = self.predictor.predict()
 
-        duty_cycle = self.calc_duty_cycle(soc, e_pred)
-        return duty_cycle
-
-    def calc_duty_cycle(self, soc, e_pred):
         dc = (
             (e_pred - self.loss_rate * soc - self.consumer.consume(0.0))
             / self.consumer.consume(1.0)
@@ -155,27 +151,23 @@ class LTENO(PredictiveManager):
         self.log = logging.getLogger("LT-ENO")
         self.log.debug(f'capacity: {self.battery_capacity:.{3}}')
 
-    def step(self, doy, soc):
-        e_pred = self.predictor.predict(np.arange(365))
+    def calc_duty_cycle(self, doy, e_in, soc):
 
-        duty_cycle = self.calc_duty_cycle(
-            soc, e_pred, self.predictor.alpha)
-        return duty_cycle
+        self.predictor.update(doy, e_in)
+        e_pred = self.predictor.predict(np.arange(365)) * self.eta_bat_in
 
-    def calc_duty_cycle(self, soc, e_pred, alpha):
-
-        e_pred = e_pred * self.eta_bat_in
         d = copy.copy(self.d)
         deficit = LTENO.deficit(e_pred, self.d)
         surplus = LTENO.surplus(e_pred, self.d)
         self.log.debug((
             f'initial: surplus={surplus:.{3}} deficit={deficit:.{3}}'
-            f' alpha={alpha:.{3}} {"under" if alpha>1.0 else "over"}estimated'
+            f' alpha={self.predictor.alpha:.{3}}'
+            f' {"under" if self.predictor.alpha>1.0 else "over"}estimated'
         ))
         while (deficit <= surplus) and (surplus < self.battery_capacity):
             d_ = copy.copy(d)
 
-            if(alpha > 1):
+            if(self.predictor.alpha > 1):
                 self.log.debug('decreasing surplus')
                 d[0] = d[0] + 1
                 d[1] = d[1] - 1
