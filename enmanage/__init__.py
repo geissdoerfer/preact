@@ -189,17 +189,22 @@ class Simulator(object):
 
         duty_cycle_real = (
             (e_out_real - self.consumer.consume(0.0))
-            / self.consumer.consume(1.0)
+            / (self.consumer.consume(1.0) - self.consumer.consume(0.0))
         )
-        return e_in_real, e_out_real, duty_cycle_real
+
+        return e_in_real, e_out_real, max(0.0, min(1.0, duty_cycle_real))
 
     def step(self, doy, e_in):
 
         e_in_real, e_out_real, duty_cycle_real = self.simulate_consumption(
             e_in * self.pwr_factor, self.next_duty_cycle)
 
-        self.next_duty_cycle = self.manager.calc_duty_cycle(
-            doy, e_in_real, self.battery.get_soc())
+        self.next_duty_cycle = max(0.0, min(
+            1.0,
+            self.manager.calc_duty_cycle(
+                doy, e_in_real, self.battery.get_soc()
+            )
+        ))
 
         log.debug((
             f'e_in={e_in:.3} '
