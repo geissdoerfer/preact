@@ -132,10 +132,8 @@ class Simulator(object):
 
             manager = LTENO(
                 predictor,
-                (
-                    config['consumer']['e_baseline']
-                    + config['consumer']['e_max_active']
-                ),
+                config['consumer']['e_baseline'],
+                config['consumer']['e_max_active'],
                 battery.capacity,
                 battery.get_eta_in(),
                 battery.get_eta_out()
@@ -157,10 +155,8 @@ class Simulator(object):
 
             manager = STEWMA(
                 predictor,
-                (
-                    config['consumer']['e_baseline']
-                    + config['consumer']['e_max_active']
-                ),
+                config['consumer']['e_baseline'],
+                config['consumer']['e_max_active'],
                 battery.get_loss_rate()
             )
         else:
