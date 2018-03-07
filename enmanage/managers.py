@@ -115,11 +115,11 @@ class PREACT(PredictiveManager):
 
 
 class STEWMA(PredictiveManager):
-    def __init__(self, predictor, consumer, loss_rate=0.0):
+    def __init__(self, predictor, e_max_active, loss_rate=0.0):
 
         PredictiveManager.__init__(self, predictor)
 
-        self.consumer = consumer
+        self.e_max_active = e_max_active
         self.loss_rate = loss_rate
 
     def calc_duty_cycle(self, doy, e_in, soc):
@@ -128,22 +128,22 @@ class STEWMA(PredictiveManager):
         e_pred = self.predictor.predict()
 
         dc = (
-            (e_pred - self.loss_rate * soc - self.consumer.consume(0.0))
-            / self.consumer.consume(1.0)
+            (e_pred - self.loss_rate * soc)
+            / self.e_max_active
         )
         return max(0.0, min(1.0, dc))
 
 
 class LTENO(PredictiveManager):
     def __init__(
-            self, predictor, consumer, battery_capacity,
+            self, predictor, e_max_active, battery_capacity,
             eta_bat_in=1.0, eta_bat_out=1.0):
 
         PredictiveManager.__init__(self, predictor)
 
         # Scale from nominal capacity
         self.battery_capacity = battery_capacity * eta_bat_out
-        self.consumer = consumer
+        self.e_max_active = e_max_active
 
         self.eta_bat_in = eta_bat_in
         self.d = predictor.d
@@ -187,8 +187,8 @@ class LTENO(PredictiveManager):
                 break
 
         dc = (
-            (e_pred[d[1] % 365] - self.consumer.consume(0.0))
-            / self.consumer.consume(1.0)
+            (e_pred[d[1] % 365])
+            / self.e_max_active
         )
         self.log.debug(f'd1={d[1]} dutycycle={dc:.{3}}')
         return max(0.0, min(1.0, dc))

@@ -35,12 +35,11 @@ class Consumer(object):
 
 class Simulator(object):
     def __init__(
-            self, manager, predictor, consumer, battery, dc_init=0.5,
+            self, manager, consumer, battery, dc_init=0.5,
             pwr_factor=1.0):
 
         self.battery = battery
         self.consumer = consumer
-        self.predictor = predictor
         self.manager = manager
 
         self.next_duty_cycle = dc_init
@@ -99,8 +98,9 @@ class Simulator(object):
 
     @classmethod
     def from_config(
-            cls, manager_cls, manager_args={},
-            predictor_args={}, config_path=None, config_dict={}):
+            cls, manager_cls, manager_args=None,
+            predictor_args=None, config_path=None, config_dict={},
+            consumer=None):
 
         config = cls.get_config(config_path, config_dict)
 
@@ -119,10 +119,11 @@ class Simulator(object):
             config['battery']['estimation_errors']
         )
 
-        consumer = Consumer(
-            config['consumer']['e_max_active'],
-            config['consumer']['e_baseline']
-        )
+        if consumer is None:
+            consumer = Consumer(
+                config['consumer']['e_max_active'],
+                config['consumer']['e_baseline']
+            )
 
         if(manager_cls is LTENO):
             predictor_args = copy.deepcopy(predictor_args)
@@ -131,7 +132,10 @@ class Simulator(object):
 
             manager = LTENO(
                 predictor,
-                consumer,
+                (
+                    config['consumer']['e_baseline']
+                    + config['consumer']['e_max_active']
+                ),
                 battery.capacity,
                 battery.get_eta_in(),
                 battery.get_eta_out()
@@ -153,12 +157,17 @@ class Simulator(object):
 
             manager = STEWMA(
                 predictor,
-                consumer,
+                (
+                    config['consumer']['e_baseline']
+                    + config['consumer']['e_max_active']
+                ),
                 battery.get_loss_rate()
             )
+        else:
+            manager = manager_cls(manager_args)
 
         return cls(
-            manager, predictor, consumer, battery,
+            manager, consumer, battery,
             config['simulator']['dc_init'],
             pwr_factor
         )
