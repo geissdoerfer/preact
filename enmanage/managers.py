@@ -5,7 +5,6 @@ import logging
 
 from .prediction import EnergyPredictor
 from .profiles import profiles
-from . import constants as C
 
 np.seterr(all='raise')
 

@@ -9,7 +9,6 @@ from .battery import Battery
 from .profiles import profiles
 from .managers import PREACT, LTENO, STEWMA
 from .prediction import EWMA, MBSGD, AST, SGD, OPTMODEL, CLAIRVOYANT
-from .constants import *
 
 base_cfg_path = resource_filename(__name__, "simulator_config.yml")
 log = logging.getLogger("simulator")
