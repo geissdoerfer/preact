@@ -188,7 +188,7 @@ class CLAIRVOYANT(EnergyPredictor):
 
 class OPTMODEL(EnergyPredictor):
 
-    def __init__(self, x_real, y_real, scale):
+    def __init__(self, x_real, y_real, scale=1.0):
 
         self.scale = scale
         model = Model(mfun, (mfun_d_a, mfun_d_b))
