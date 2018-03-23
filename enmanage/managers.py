@@ -144,6 +144,64 @@ class PIDPM(EnergyManager):
         )
 
         return max(0.0, min(1.0, duty_cycle))
+
+
+class ENOMAX(EnergyManager):
+    def __init__(
+            self, battery_capacity,
+            battery_age_rate, init_soc, **kwargs):
+
+        self.battery_capacity = battery_capacity
+        self.battery_age_rate = battery_age_rate
+
+        self.params = np.array([2.0, -1.0, 1.0])
+        self.duty_cycle = 0.5
+
+        self.soc_target = 0.5
+
+        self.learning_rate = kwargs.get('learning_rate', 0.5)
+        self.alpha = kwargs.get('alpha', 1.0/24)
+        self.beta = kwargs.get('beta', 0.25)
+
+        self.phi = np.array([init_soc, self.duty_cycle, -self.soc_target])
+        self.step_count = 0
+
+    def estimate_capacity(self, offset=0):
+        return (
+            self.battery_capacity
+            * (1.0 - (self.step_count + offset) * self.battery_age_rate)
+        )
+
+    def calc_duty_cycle(self, doy, e_in, soc):
+        param_update = (
+            self.learning_rate/np.dot(self.phi, self.phi) * self.phi
+            * (soc/self.estimate_capacity() - np.dot(self.phi, self.params))
+        )
+
+        #print(self.phi, self.params, soc/self.estimate_capacity(), param_update)
+        self.params += param_update
+        duty_cycle = (
+            (
+                self.soc_target
+                - self.params[0]*soc/self.estimate_capacity()
+                + self.params[2]*self.soc_target
+            )
+            / self.params[1]
+        )
+        duty_cycle = max(0.0, min(1.0, duty_cycle))
+
+        self.phi = np.array(
+            [soc/self.estimate_capacity(), self.duty_cycle, self.soc_target]
+        )
+
+        self.duty_cycle += self.alpha * (duty_cycle - self.duty_cycle)
+
+        rho = self.beta * duty_cycle + (1 - self.beta) * self.duty_cycle
+        self.step_count += 1
+
+        return rho
+
+
 class STEWMA(PredictiveManager):
     def __init__(self, predictor, e_baseline, e_max_active, loss_rate=0.0):
 

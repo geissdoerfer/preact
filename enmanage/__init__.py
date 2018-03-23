@@ -7,7 +7,7 @@ from pkg_resources import Requirement, resource_filename
 
 from .battery import Battery
 from .profiles import profiles
-from .managers import PREACT, LTENO, STEWMA, PIDPM
+from .managers import PREACT, LTENO, STEWMA, PIDPM, ENOMAX
 from .prediction import EWMA, MBSGD, AST, SGD, OPTMODEL, CLAIRVOYANT
 
 base_cfg_path = resource_filename(__name__, "simulator_config.yml")
@@ -164,6 +164,15 @@ class Simulator(object):
             manager = PIDPM(
                 battery.capacity,
                 battery.get_age_rate(),
+                **manager_args
+            )
+        elif(manager_cls == ENOMAX):
+            predictor = None
+
+            manager = ENOMAX(
+                battery.capacity,
+                battery.get_age_rate(),
+                config['battery']['soc_init'],
                 **manager_args
             )
         else:
