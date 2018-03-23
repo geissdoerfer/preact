@@ -113,6 +113,37 @@ class PREACT(PredictiveManager):
         return max(0.0, min(1.0, duty_cycle))
 
 
+class PIDPM(EnergyManager):
+    def __init__(
+            self, battery_capacity,
+            battery_age_rate, **kwargs):
+
+        self.controller = PIDController(
+            kwargs.get('control_coefficients', None))
+
+        self.battery_capacity = battery_capacity
+        self.battery_age_rate = battery_age_rate
+
+        self.step_count = 0
+
+        self.soc_target = 0.5
+
+    def estimate_capacity(self, offset=0):
+        return (
+            self.battery_capacity
+            * (1.0 - (self.step_count + offset) * self.battery_age_rate)
+        )
+
+    def calc_duty_cycle(self, doy, e_in, soc):
+
+        self.step_count += 1
+
+        duty_cycle = self.controller.calculate(
+            self.soc_target,
+            soc / self.estimate_capacity()
+        )
+
+        return max(0.0, min(1.0, duty_cycle))
 class STEWMA(PredictiveManager):
     def __init__(self, predictor, e_baseline, e_max_active, loss_rate=0.0):
 
