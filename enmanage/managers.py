@@ -97,7 +97,7 @@ class PREACT(PredictiveManager):
         if(p2p_1y < self.estimate_capacity() / 10000):
             return 1.0
 
-        f_scale = min(1.0, self.estimate_capacity(365) / p2p_1y)
+        f_scale = min(1.0, self.estimate_capacity() / p2p_1y)
 
         offset = (self.estimate_capacity() - f_scale * p2p_1y) / 2
 
