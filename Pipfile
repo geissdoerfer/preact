@@ -16,6 +16,7 @@ seaborn = "*"
 pytest = "*"
 pytest-sugar = "*"
 parse = "*"
+pyyaml = "*"
 
 
 [dev-packages]

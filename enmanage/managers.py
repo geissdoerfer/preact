@@ -106,8 +106,8 @@ class PREACT(PredictiveManager):
         self.step_count += 1
 
         duty_cycle = self.controller.calculate(
-            self.soc_target / self.battery_capacity,
-            (soc + e_pred[0]) / self.battery_capacity
+            self.soc_target / self.estimate_capacity(),
+            (soc + e_pred[0]) / self.estimate_capacity()
         )
 
         return max(0.0, min(1.0, duty_cycle))
@@ -159,7 +159,7 @@ class ENOMAX(EnergyManager):
 
         self.soc_target = 0.5
 
-        self.learning_rate = kwargs.get('learning_rate', 0.5)
+        self.learning_rate = kwargs.get('learning_rate', 0.01)
         self.alpha = kwargs.get('alpha', 1.0/24)
         self.beta = kwargs.get('beta', 0.25)
 
@@ -178,7 +178,6 @@ class ENOMAX(EnergyManager):
             * (soc/self.estimate_capacity() - np.dot(self.phi, self.params))
         )
 
-        #print(self.phi, self.params, soc/self.estimate_capacity(), param_update)
         self.params += param_update
         duty_cycle = (
             (
@@ -191,7 +190,7 @@ class ENOMAX(EnergyManager):
         duty_cycle = max(0.0, min(1.0, duty_cycle))
 
         self.phi = np.array(
-            [soc/self.estimate_capacity(), self.duty_cycle, self.soc_target]
+            [soc/self.estimate_capacity(), duty_cycle, -self.soc_target]
         )
 
         self.duty_cycle += self.alpha * (duty_cycle - self.duty_cycle)
