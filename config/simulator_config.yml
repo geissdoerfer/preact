@@ -18,7 +18,7 @@ consumer:
     e_max_active: 1.0
 
 harvesting:
-    a_panel: 0.003500.0
+    a_panel: 0.003500
     eta_vc_in: .75
     eta_panel: 0.025
     voltage: 3.0
