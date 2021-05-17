@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import parse
 from datetime import datetime
+import pkg_resources
 
 
 class ExampleData(object):

@@ -15,6 +15,10 @@ setup(
     author_email="kai.geissdoerfer@tu-dresden.de",
     license=license,
     include_package_data=True,
-    install_requires=["numpy", "scipy", "pyyaml", "matplotlib"],
-    packages=find_packages(),
+    install_requires=["numpy", "scipy", "pyyaml", "matplotlib", "pandas", "parse"],
+    packages=["enmanage"],
+    package_dir={"enmanage": "enmanage"},  # the one line where all the magic happens
+    package_data={
+        "enmanage": ["data/*.txt", "config/default.yml"],
+    },
 )

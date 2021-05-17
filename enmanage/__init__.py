@@ -11,7 +11,7 @@ from .managers import PREACT, LTENO, STEWMA, PIDPM, ENOMAX
 from .prediction import EWMA, MBSGD, AST, SGD, OPTMODEL, CLAIRVOYANT
 from .data import data
 
-base_cfg_path = resource_filename(__name__, "config/simulator_config.yml")
+base_cfg_path = resource_filename(__name__, "config/default.yml")
 log = logging.getLogger("simulator")
 
 
