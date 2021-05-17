@@ -14,9 +14,7 @@ setup(
     author="Kai Geissdoerfer",
     author_email="kai.geissdoerfer@tu-dresden.de",
     license=license,
-    setup_requires=["pytest-runner"],
-    tests_require=["pytest"],
     include_package_data=True,
     install_requires=["numpy", "scipy", "pyyaml", "matplotlib"],
-    packages=find_packages(exclude=("tests", "docs", "scripts", "data")),
+    packages=find_packages(),
 )
