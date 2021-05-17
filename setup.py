@@ -16,7 +16,6 @@ setup(
     license=license,
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
-    package_data={"enmanage": ["config/simulator_config.yml"]},
     include_package_data=True,
     install_requires=["numpy", "scipy", "pyyaml", "matplotlib"],
     packages=find_packages(exclude=("tests", "docs", "scripts", "data")),

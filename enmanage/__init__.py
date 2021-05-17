@@ -9,8 +9,9 @@ from .battery import Battery
 from .profiles import profiles
 from .managers import PREACT, LTENO, STEWMA, PIDPM, ENOMAX
 from .prediction import EWMA, MBSGD, AST, SGD, OPTMODEL, CLAIRVOYANT
+from .data import data
 
-base_cfg_path = resource_filename(__name__, "simulator_config.yml")
+base_cfg_path = resource_filename(__name__, "config/simulator_config.yml")
 log = logging.getLogger("simulator")
 
 
@@ -227,9 +228,9 @@ class Simulator(object):
         )
 
     def run(self, doys, e_ins):
-        budget = np.zeros(len(doys))
-        soc = np.zeros(len(doys))
-        duty_cycle = np.zeros(len(doys))
+        budget = np.zeros((len(doys),))
+        soc = np.zeros((len(doys),))
+        duty_cycle = np.zeros((len(doys),))
         for i, (doy, e_in) in enumerate(zip(doys, e_ins)):
             soc[i], duty_cycle[i], e_in_real, budget[i] = self.step(doy, e_in)
 
