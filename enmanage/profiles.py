@@ -4,15 +4,15 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 
 wl = 13
-margin = int(np.floor(wl/2))
-wndw = np.ones(wl)/wl
+margin = int(np.floor(wl / 2))
+wndw = np.ones(wl) / wl
 
 ds = np.arange(365)
 
 p = dict()
-p['uniform'] = np.ones(365)
+p["uniform"] = np.ones(365)
 
-rnd_holidays = np.ones(365)*0.5
+rnd_holidays = np.ones(365) * 0.5
 
 holidays = list()
 # 01.01.-22.01.: 1-22
@@ -40,33 +40,18 @@ weekends += [i for i in range(8, 365, 7)]
 rnd_holidays[holidays] = 1.0
 rnd_holidays[weekends] = 1.0
 
-p['holidays'] = rnd_holidays
-
-rainfall = np.array(
-    [270.1, 298.7, 192.4, 66.4, 31.7, 21.2, 14.9, 16.1, 10.4, 23.4, 58.4,
-     127.7])
+p["holidays"] = rnd_holidays
 
 p_tmp = np.ones(365)
-p_tmp[-60:-30] = np.linspace(1.0, 0.5, 30)
-p_tmp[-30:] = 0.5
-p_tmp[:90] = 0.5
-p_tmp[90:120] = np.linspace(0.5, 1.0, 30)
-p_cattle = np.convolve(p_tmp, wndw, 'full')[margin:-margin]
-p_cattle[:wl] = 0.5
-p_cattle[-wl:] = 0.5
+p_tmp[3 * 30 : 4 * 30] = np.linspace(1.0, 0.1, 30)
+p_tmp[4 * 30 : 8 * 30] = 0.1
+p_tmp[8 * 30 : 9 * 30] = np.linspace(0.1, 1.0, 30)
 
-p['cattle'] = p_cattle
+p_seasonal = np.convolve(p_tmp, wndw, "full")[margin:-margin]
+p_seasonal[:wl] = 1.0
+p_seasonal[-wl:] = 1.0
 
-p_tmp = np.ones(365)
-p_tmp[3*30:4*30] = np.linspace(1.0, 0.1, 30)
-p_tmp[4*30:8*30] = 0.1
-p_tmp[8*30:9*30] = np.linspace(0.1, 1.0, 30)
-
-p_amazon = np.convolve(p_tmp, wndw, 'full')[margin:-margin]
-p_amazon[:wl] = 1.0
-p_amazon[-wl:] = 1.0
-
-p['amazon'] = p_amazon
+p["seasonal"] = p_seasonal
 
 profiles = dict()
 
